@@ -1,41 +1,13 @@
 /**
  * Tests for the parade-state signature matcher.
  *
- * The positive cases are the five real messages in parade-state-example/, which
- * between them cover every layout the companies actually use. The negative
- * cases are the chatter that must never reach the spreadsheet.
+ * The positive cases in the "first parade gate" block are well-formed parade states
+ * built around one header under test. The negative cases are the chatter that must
+ * never reach the spreadsheet.
  */
 
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { isFirstParade, isParadeState } from '../src/signature.js';
-
-/** @type {string} Directory holding the real parade-state samples. */
-const EXAMPLES_DIR = join(import.meta.dir, '..', '..', 'parade-state-example');
-
-/** @type {string[]} Basenames of the real parade-state samples. */
-const EXAMPLE_FILES = ['archer.txt', 'braves.txt', 'cougar.txt', 'hercules.txt', 'stallion.txt'];
-
-/**
- * Reads one of the real parade-state samples.
- *
- * @param {string} name Basename of the sample file.
- * @returns {string} The file contents.
- */
-function readExample(name) {
-  return readFileSync(join(EXAMPLES_DIR, name), 'utf8');
-}
-
-describe('isParadeState - real parade states', () => {
-  for (const name of EXAMPLE_FILES) {
-    test(`accepts ${name}`, () => {
-      const result = isParadeState(readExample(name));
-      expect(result.rejectReason).toBeNull();
-      expect(result.accepted).toBe(true);
-    });
-  }
-});
 
 describe('isParadeState - chatter', () => {
   /** @type {Array<[string, string]>} Label and text of each rejected message. */

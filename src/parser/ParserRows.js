@@ -10,9 +10,9 @@
  *    total_strength - total_present. Real messages have internally inconsistent
  *    header counts, so this would flag most of them and defeat the automation.
  * 2. No deriving `num_days` from the start/end date pair. This looks like an
- *    easy win and is not: across the labelled messages in
- *    `parade-state-example/`, every entry carrying both dates already states its
- *    own day-count, so a derivation would fire only where none is stated — and
+ *    easy win and is not: across real messages, every entry carrying both dates
+ *    already states its own day-count, so a derivation would fire only where
+ *    none is stated — and
  *    the shape where none is stated is the overnight duty
  *    ("DATE & TIME: 180626 1630 - 190626 0800"), which is one duty, not the two
  *    days an inclusive count produces. The prompt states that rule instead, so

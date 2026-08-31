@@ -6,7 +6,7 @@
  * **Counts are of soldiers, not rows.** A company that files both FPS and LPS lists the
  * same absentee twice, so every headcount deduplicates on identity within a date.
  *
- * **Comparisons are rates, not counts.** In the labelled examples Braves shows 40 MC
+ * **Comparisons are rates, not counts.** In the real data Braves shows 40 MC
  * rows against Hercules' 7, which says nothing until divided by strength — Braves is the
  * larger company. Anything compared across units is expressed as a percentage of the
  * days that unit was observed.
@@ -538,7 +538,7 @@ export function durationDistribution(episodes) {
  * Counts how often each symptom appears, and how much of the data said anything at all.
  *
  * Coverage travels with the counts because it is low in the parade state — only 16 of
- * 61 `Att C` rows in the labelled examples carry a symptom, the rest being a bare "MC".
+ * 61 `Att C` rows in the real data carry a symptom, the rest being a bare "MC".
  * A symptom chart drawn over a quarter of the episodes would otherwise read as the whole
  * picture.
  * @param {Array<!Object>} episodes Episodes carrying a `symptoms` array.

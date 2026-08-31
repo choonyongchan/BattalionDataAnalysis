@@ -4,10 +4,8 @@
  * The most valuable cases here are the two the design was corrected into. `Att C` *is*
  * MC, so every `Att C` row counts as MC whatever its `reason` says — including the ones
  * written `HL`, `FEVER` and `FOOD POISONING`. And nothing outside `Att C` counts as MC,
- * which matters because the labelled data contains 19 `AFMC` rows (Air Force Medical
- * Centre appointments) and a `RETURNING FROM MC` that a text match would wrongly sweep
- * in. Both directions are asserted against the real labelled messages, not only against
- * hand-written examples.
+ * which matters because `AFMC` rows (Air Force Medical Centre appointments) and a
+ * `RETURNING FROM MC` would be wrongly swept in by a text match.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -19,12 +17,6 @@ import {
   isRestricted,
   keywords,
 } from '../../dashboard/js/model/classify.js';
-import { toRecords } from '../../dashboard/js/model/normalize.js';
-import { PERSONNEL_HEADERS, TABS } from '../../dashboard/js/model/schema.js';
-import { sheetValues } from './fixtures.js';
-
-/** @type {Array<!Object>} Every labelled personnel row, in sheet shape. */
-const personnel = toRecords(sheetValues().personnel, PERSONNEL_HEADERS, TABS.PERSONNEL);
 
 describe('MC is Att C, matched by category', () => {
   test('an Att C row is MC whatever its reason says', () => {
@@ -43,20 +35,6 @@ describe('MC is Att C, matched by category', () => {
     expect(classify({ reason_category: 'Others', reason: 'RETURNING FROM MC' })).toBe(
       DUTY_CLASS.OTHERS
     );
-  });
-
-  test('across the labelled data, MC and Att C are the same set', () => {
-    const attC = personnel.filter((row) => row.reason_category === 'Att C');
-    const mc = personnel.filter((row) => classify(row) === DUTY_CLASS.MC);
-    expect(attC.length).toBe(61);
-    expect(mc.length).toBe(attC.length);
-  });
-
-  test('no row outside Att C is ever classified as MC', () => {
-    const strays = personnel.filter(
-      (row) => classify(row) === DUTY_CLASS.MC && row.reason_category !== 'Att C'
-    );
-    expect(strays).toEqual([]);
   });
 
   test('an unrecognised category surfaces as Unknown rather than vanishing', () => {

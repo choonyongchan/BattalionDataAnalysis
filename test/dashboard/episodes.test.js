@@ -1,7 +1,7 @@
 /**
  * Tests for collapsing daily snapshots into episodes.
  *
- * The labelled examples are almost all a single date and a single session, so they
+ * Real parade-state data is almost all a single date and a single session, so it
  * cannot exercise this at all — the shapes here are synthetic, built through the real
  * column order by `personnelValues`. What they pin is the distinction the whole feature
  * rests on: a soldier on four days of MC is one episode, not four, and not eight when

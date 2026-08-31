@@ -137,10 +137,10 @@ Two consequences of that direction:
   dashboard requires still exists in the canonical `*_COLUMNS` arrays, so an upstream
   rename fails a test instead of shipping a blank chart.
 - **`dashboard/` is a deployment boundary**, exactly as `src/` is for clasp: everything
-  inside it is published. So its tests live in `test/dashboard/`, and its fixtures are
-  built by running the real `ParserRows` over the labelled messages in
-  `parade-state-example/` — the rows under test cannot drift from the rows the parser
-  writes, because the parser writes them.
+  inside it is published. So its tests live in `test/dashboard/`, and its fixtures
+  (`test/dashboard/fixtures.js`) are built from the real `PERSONNEL_DATA_COLUMNS` /
+  `STRENGTH_DATA_COLUMNS` arrays via `ParserRows`, so the rows under test cannot drift
+  from the column order the parser writes.
 
 - **The three category views are one renderer, not three.** MC, report sick and status
   ask the same four questions — trend, company, platoon, who most often — so
@@ -261,21 +261,14 @@ behaves as it does in Apps Script's single realm. Three loaders:
 The pattern to preserve: **the Apps Script sources need no test-only modification**.
 No exports, no module wrapper, no bundler between the editor and the deployed script.
 
-Two things in `test/` are not `bun test` files:
+One thing in `test/` is not a `bun test` file:
 
-- **`parser.eval.js`** scores extraction against the labelled messages in
-  `parade-state-example/` and prices it (`bun run eval`, `--sweep` for several models
-  cheapest-first). It makes real API calls, which is why it is not a `*.test.js`. Its
-  tiered accuracy bar is what makes a model change a measured decision rather than an
-  argument; `parser.eval.test.js` tests the scorer itself, because an instrument stuck
-  at 100% would bless anything.
 - **`MANUAL_CHECKS.md`** is the post-deploy checklist for what cannot be automated.
 
-`parade-state-example/*-struct.json` are hand-labelled ground truth, and
-`parser.rows.test.js` runs `validate` over all five so the labels and the validator
-cannot drift apart. When editing them the governing rule is the prompt's own: **never
-record a value the message does not state.** An audit against that rule removed 35
-inferred `in_camp` labels.
+Real parade-state messages were hand-labelled during design to tune the prompt and
+validator. The governing rule when reading them is the prompt's own: **never record a
+value the message does not state.** An audit against that rule removed 35 inferred
+`in_camp` labels. Those labelled messages are kept outside the repo.
 
 ## Third-party boundaries
 

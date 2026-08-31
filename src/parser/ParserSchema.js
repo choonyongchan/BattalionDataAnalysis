@@ -234,9 +234,8 @@ const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions'
 /**
  * Model used for parade-state extraction, on the Flex processing tier.
  *
- * Chosen by `test/parser.eval.js`, which scores candidate models against the
- * labelled messages in `parade-state-example/` cheapest-first and reports
- * $/message. Change this only on the back of an eval run.
+ * Change this only after re-checking extraction accuracy and cost against real
+ * parade-state messages, not on a hunch.
  * @type {string}
  */
 const OPENAI_MODEL = 'gpt-5.6-luna';

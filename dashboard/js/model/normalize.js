@@ -149,7 +149,7 @@ export function toText(value) {
  * Normalises a person's name for use as an identity key.
  *
  * Used only as the fallback when `four_d` is blank, which is 14% of personnel rows in
- * the labelled examples. Collapses case, punctuation and runs of whitespace, so
+ * the real data. Collapses case, punctuation and runs of whitespace, so
  * "NG JUN WEI, CALEB" and "Ng Jun Wei Caleb" resolve to the same soldier.
  * @param {*} name Raw name cell.
  * @returns {string} A normalised key, or '' when the name is blank.

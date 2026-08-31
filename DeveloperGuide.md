@@ -32,14 +32,14 @@ dashboard reads "Strength Data" and "Personnel Data" directly as data sources.
 **One free-text Form question, not four structured ones.** An earlier
 iteration of this design put Company/Date/Parade-type into their own Form
 questions specifically so the AI wouldn't have to infer them — but that
-duplicated data the clerk was already about to paste (every sample message
-in `./parade-state-example/*.txt` states its own company and date somewhere)
+duplicated data the clerk was already about to paste (a parade-state message
+states its own company and date somewhere in the text)
 and added friction to the one step that needs to be fast: submitting the
 parade state. The Form was shrunk back down to the single free-text
 question, and `ParserAi.buildPrompt_()` now identifies company, date,
 and session from the message text itself — including a specific rule for
 Hercules, the battalion's own HQ element, which never spells out its name
-and only ever says "HQ Company" (see `parade-state-example/hercules.txt`).
+and only ever says "HQ Company".
 The tradeoff, accepted deliberately: identity extraction can now fail (an
 ambiguous or truncated message), in which case `ParserRows.validate()` returns
 a reason that is written to the row's `error` column rather than guessing.
@@ -100,8 +100,8 @@ that before calling `finishRow`. Without it the key is written one row too low �
 silently, onto whatever submission happens to be there. This was a live bug in the
 pre-`src/parser` code, found by `test/parser.contract.test.js`.
 
-**Extraction is AI-based, not regex/fixed-format parsing.** Five real sample
-messages (`./parade-state-example/*.txt`) were reviewed during design. Every
+**Extraction is AI-based, not regex/fixed-format parsing.** Real sample
+messages from every company were reviewed during design. Every
 company's clerk formats the free-text parade-state box differently —
 different headers, different category orderings, some split into per-platoon
 blocks, some flat, strength expressed as fractions in one message and as two
@@ -110,13 +110,6 @@ maintenance as formatting drifts; an AI model with a strict response schema
 and a heavily-worked prompt tolerates this variance far better. See
 `ParserAi.buildPrompt_()` for the exact rules distilled from the sample
 data.
-
-Those five messages are also hand-labelled (`*-struct.json`) and serve as a
-scored eval set: `bun run eval` reports per-field accuracy and cost, and
-`--sweep` runs candidate models cheapest-first against a tiered accuracy bar.
-That is what makes a model change a measured decision rather than an argument.
-`test/parser.rows.test.js` runs `validate` over all five, so the labels and the
-validator cannot drift apart.
 
 **The prompt asks the model to read, never to compute.** An obvious-looking
 optimisation is to derive `num_days` from the start/end dates in code and stop
@@ -397,9 +390,8 @@ log.
   validate-then-record shape intact.
 - **Changing the model**: `OPENAI_MODEL` in `parser/ParserSchema.js` is the only
   place the name is referenced (`OPENAI_CHAT_COMPLETIONS_URL` sits next to it).
-  Change it on the back of a `bun run eval` result, not a hunch —
-  `bun run eval --sweep a,b,c` scores candidates cheapest-first against a tiered
-  accuracy bar and reports per-message token counts.
+  Change it deliberately and re-check extraction quality against real
+  parade-state messages, not on a hunch.
 - **Reprocessing without a new submission**: clear the row's
   `parade_response_id` in the sheet, or run `reprocessRow(rowIndex)` from the
   editor. The `reprocessPendingRows` Sheets menu macro is the batch equivalent —

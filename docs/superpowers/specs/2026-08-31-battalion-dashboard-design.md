@@ -24,7 +24,7 @@ Findings from the sheets and from the design research that drive the whole desig
   NRIC`. Nothing gets published to the web.
 - **`Att C` *is* MC** — confirmed both by you and by doctrine: Attend C means excused all
   duties, and in NS that normally means resting at home on MC. All 61 `Att C` rows in the
-  labelled examples are MC, including the three written as `HL`, `FEVER` and `FOOD POISONING`.
+  data reviewed during design are MC, including the three written as `HL`, `FEVER` and `FOOD POISONING`.
   So MC is a category match, not a text match. This matters: a text match on "MC" would have
   wrongly swept in 19 `AFMC` rows (Air Force Medical Centre appointments, category `Others`)
   and one `RETURNING FROM MC`.
@@ -119,7 +119,7 @@ dashboard/
       overview.js  attendance.js  patterns.js  soldier.js
     charts.js            # shared ECharts theme + helpers
   test/
-    fixtures.js          # sheet-shaped rows built from the labelled examples
+    fixtures.js          # sheet-shaped rows built via the real parser
     *.test.js
 .github/workflows/pages.yml
 ```
@@ -177,8 +177,8 @@ Key: `four_d`, falling back to a normalised `name`. Within one class, rows shari
 gap greater than one day starts a new episode.
 
 Duration reports **both** the stated `num_days` and the `start_date`→`end_date` span, and flags
-disagreement rather than picking one. `ParserRows` documents that the labelled examples contain
-messages whose stated day-count contradicts their own date range, and that deriving the count
+disagreement rather than picking one. `ParserRows` documents that real
+messages contain a stated day-count that contradicts their own date range, and that deriving the count
 is wrong precisely where it fires. The dashboard honours that and turns the contradiction into
 a data-quality signal for S1.
 
@@ -235,12 +235,11 @@ build step in the workflow; it uploads the directory as-is.
 
 ## Testing
 
-`dashboard/test/fixtures.js` builds sheet-shaped rows by loading the real Apps Script parser
-through the existing `loadParser()` in `test/harness.js:308` and running
-`ParserRows.buildStrengthRows` / `buildPersonnelRows` / `buildCommandRosterRows` over the
-hand-labelled `parade-state-example/*-struct.json`. Fixtures therefore **cannot drift from the
-real sheet layout**, because they are produced by the code that writes it — the same reuse
-`test/parser.rows.test.js` already relies on.
+`test/dashboard/fixtures.js` builds sheet-shaped rows by loading the real Apps Script parser
+through the existing `loadParser()` in `test/harness.js` and taking its
+`PERSONNEL_DATA_COLUMNS` / `STRENGTH_DATA_COLUMNS` arrays, so the column order under test
+**cannot drift from the real sheet layout** — it is read from the code that writes it. Each
+test supplies its own rows in that column order.
 
 Unit tests cover `normalize`, `classify`, `episodes` and `metrics` — including the two cases
 this plan was corrected into: `AFMC` and `RETURNING FROM MC` must **not** count as MC, and
@@ -261,7 +260,7 @@ the spreadsheet, and its ownership boundary: read-only, no writes, no `src/` dep
 `README.md` (dashboard section replacing the Looker-only guidance).
 
 **Read, never modified:** `src/parser/ParserSchema.js`, `src/formsg/FormSgColumns.js`,
-`test/harness.js`, `parade-state-example/*`.
+`test/harness.js`.
 
 ## Phases
 

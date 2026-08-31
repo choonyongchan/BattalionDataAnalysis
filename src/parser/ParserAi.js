@@ -50,11 +50,11 @@ class ParserAi {
    * current prompting guidance, which favours concise, non-redundant
    * instructions over heavily scaffolded prompts.
    *
-   * Every rule here is a rule about *reading*, never about computing: the
-   * labelled messages in `parade-state-example/` contain entries whose stated
-   * day-count disagrees with their own date range, and overnight duties whose
-   * range spans two dates but count as one day. So the prompt asks for what the
-   * message says and `ParserRows` derives nothing — see its header.
+   * Every rule here is a rule about *reading*, never about computing: real
+   * messages contain entries whose stated day-count disagrees with their own
+   * date range, and overnight duties whose range spans two dates but count as
+   * one day. So the prompt asks for what the message says and `ParserRows`
+   * derives nothing — see its header.
    * @param {string} rawText The raw parade-state text to extract from.
    * @returns {string} The complete prompt text.
    */

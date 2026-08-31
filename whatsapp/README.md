@@ -88,8 +88,8 @@ Chatter never reaches the spreadsheet, and neither does any session other than t
 both cheap:
 
 **Structural gates** — ≥ 8 non-empty lines, ≥ 200 characters, and the anchor phrase `/parade\s*state/i`. The
-thresholds come from the five real samples in `../parade-state-example/`, whose smallest (`hercules.txt`) is 32
-lines / 969 characters. `"Why is your parade state late?"` carries the anchor phrase but is one short line, so it
+thresholds were calibrated against real parade-state messages, the smallest of which runs about 32 lines /
+970 characters. `"Why is your parade state late?"` carries the anchor phrase but is one short line, so it
 is rejected here.
 
 **First-parade gate** — the message must either carry an explicit `FIRST PARADE` / `FPS` marker, or have a

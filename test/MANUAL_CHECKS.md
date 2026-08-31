@@ -11,12 +11,7 @@ than remembered. `test/` is outside the clasp deployment boundary (`.clasp.json`
 
 ```sh
 bun test ./test/ ./whatsapp/test/     # must be green
-bun run eval                          # scores the current model, costs money
 ```
-
-`bun run eval` is excluded from `bun test` deliberately — it makes real API calls. See
-[parser.eval.js](parser.eval.js) for the tiered accuracy bar and the cheapest-first
-sweep (`--sweep a,b,c`).
 
 ## 1. One-time spreadsheet migration
 

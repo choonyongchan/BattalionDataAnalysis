@@ -10,7 +10,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { join } from 'node:path';
 import { loadConfig } from '../src/config.js';
 import { buildIntakePayload, buildIntakeUrl, relayParadeState } from '../src/appsScriptClient.js';
 import { extractText, isWatchedGroupMessage } from '../src/listener.js';
@@ -204,14 +203,24 @@ describe('createMessageHandler', () => {
   });
 
   /**
-   * Reads a real parade state from the sample corpus.
-   *
-   * @param {string} company Basename in parade-state-example/, without .txt.
-   * @returns {Promise<string>} The message text.
+   * A minimal well-formed first parade state: enough signals and bulk to clear every
+   * signature gate, standing in for a real sample so these tests need no external corpus.
+   * @type {string}
    */
-  function sample(company) {
-    return Bun.file(join(import.meta.dir, '..', '..', 'parade-state-example', `${company}.txt`)).text();
-  }
+  const PARADE_STATE = [
+    'HERCULES COMPANY FIRST PARADE STATE',
+    'DATE: 220626 @ 0730 Hrs',
+    '',
+    'TOTAL STRENGTH: 136',
+    'CURRENT STRENGTH: 120',
+    'PLATOON 1: 51/55',
+    'PLATOON 2: 49/56',
+    'COMMANDERS: 20/25',
+    '[OFFICER]: 05/07',
+    'CDO: 2LT RYAN',
+    'CDS: 3SG DENNIS TAN',
+    'Padding line to clear the character gate comfortably for this test case.',
+  ].join('\n');
 
   test('relays an accepted parade state with its message id', async () => {
     /** @type {!Array<!Object>} */
@@ -225,7 +234,7 @@ describe('createMessageHandler', () => {
       config: { dryRun: false, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
       logger: silentLogger,
     });
-    await handle(await sample('hercules'), { key: { id: 'MSG1' } });
+    await handle(PARADE_STATE, { key: { id: 'MSG1' } });
 
     expect(bodies).toHaveLength(1);
     expect(bodies[0].messageId).toBe('MSG1');
@@ -259,7 +268,7 @@ describe('createMessageHandler', () => {
       config: { dryRun: true, appsScriptUrl: EXEC_URL, appsScriptToken: 'tok' },
       logger: silentLogger,
     });
-    await handle(await sample('hercules'), { key: { id: 'MSG3' } });
+    await handle(PARADE_STATE, { key: { id: 'MSG3' } });
 
     expect(called).toBe(false);
   });
@@ -274,6 +283,6 @@ describe('createMessageHandler', () => {
       logger: silentLogger,
     });
 
-    expect(await handle(await sample('hercules'), { key: { id: 'MSG4' } })).toBeUndefined();
+    expect(await handle(PARADE_STATE, { key: { id: 'MSG4' } })).toBeUndefined();
   });
 });
