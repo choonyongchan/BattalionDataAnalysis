@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "test": "bun test ./test/ ./whatsapp/test/",
+    "eval": "bun run test/parser.eval.js"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.3.0"
+  }
+}

@@ -1,0 +1,148 @@
+/**
+ * Detection of first-parade-state messages.
+ *
+ * WhatsApp groups carry ordinary chatter alongside the parade states we care
+ * about. This module decides, from the message text alone, whether a message is
+ * worth relaying, so chatter never reaches the spreadsheet.
+ *
+ * Two gates, in order:
+ *   1. Cheap structural gates reject anything too short or missing the anchor
+ *      phrase. This alone rejects near-misses such as
+ *      "Why is your parade state late?".
+ *   2. A first-parade gate, since only first parade states are processed.
+ *
+ * There used to be a third stage: a score over six layout signals (strength
+ * lines, present/total ratios, unit tokens, bracketed rank groups and so on),
+ * needing three matches to accept. It is gone. Deciding whether a message is a
+ * real parade state is what AiService and Validator do on the other side, and
+ * they do it by reading the message rather than by guessing from its shape — so
+ * the score was a second, weaker copy of a judgement already being made
+ * downstream. What it added was a way to drop a genuine parade state whose
+ * layout was merely unusual, with the rejection recorded nowhere. A message
+ * that clears the gates but is not a parade state now lands in Parade State
+ * Errors as NEEDS_REVIEW, which is visible and reversible.
+ */
+
+/** @type {number} Minimum non-empty lines a parade state must have. */
+const MIN_LINES = 8;
+
+/** @type {number} Minimum characters a parade state must have. */
+const MIN_CHARS = 200;
+
+/** @type {RegExp} Anchor phrase every known parade state contains. */
+const ANCHOR_PATTERN = /parade\s*state/i;
+
+/**
+ * @type {number} How many non-empty lines from the top count as the header.
+ * The company, date, session and timing always sit in this block; searching
+ * only here keeps stray four-digit numbers in the body out of the timing check.
+ */
+const HEADER_LINES = 5;
+
+/**
+ * @type {RegExp} Explicit first-parade markers. Matches "FIRST PARADE STATE"
+ * (archer, cougar, hercules), the bare "FIRST PARADE" (stallion), and "FPS".
+ */
+const FIRST_PARADE_PATTERN = /first\s*parade|\bFPS\b/i;
+
+/**
+ * @type {RegExp} A 24-hour HHMM timing such as 0830, 0715 or 1930.
+ *
+ * The digit lookaround is what makes this safe: it refuses to match inside the
+ * six-digit DDMMYY dates that sit right beside the timing ("220626 FP 0738"
+ * yields 0738 only), while still matching when the timing is glued to a suffix
+ * ("0930HRS").
+ */
+const TIMING_PATTERN = /(?<!\d)(?:[01]\d|2[0-3])[0-5]\d(?!\d)/g;
+
+/** @type {number} Timings strictly before this hour count as a first parade. */
+const FIRST_PARADE_CUTOFF_HOUR = 12;
+
+/**
+ * Counts the non-empty lines in the text.
+ *
+ * @param {string} text Raw message text.
+ * @returns {number} Number of lines containing at least one non-space glyph.
+ */
+function countNonEmptyLines(text) {
+  return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+}
+
+/**
+ * Returns the header block of a message.
+ *
+ * @param {string} text Raw message text.
+ * @returns {string} The first HEADER_LINES non-empty lines, newline-joined.
+ */
+export function extractHeader(text) {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .slice(0, HEADER_LINES)
+    .join('\n');
+}
+
+/**
+ * Reports whether the header carries a timing before noon.
+ *
+ * Companies that do not label the session still stamp the header with the
+ * time the state was taken ("220626 FP 0738"), and a first parade is always a
+ * morning one, so a timing before 12:00 stands in for the missing label.
+ *
+ * @param {string} header The message header block.
+ * @returns {boolean} True when at least one HHMM timing is before noon.
+ */
+function hasMorningTiming(header) {
+  const timings = header.match(TIMING_PATTERN);
+  if (timings === null) {
+    return false;
+  }
+  return timings.some((timing) => Number(timing.slice(0, 2)) < FIRST_PARADE_CUTOFF_HOUR);
+}
+
+/**
+ * Reports whether a message is a first parade state rather than a later one.
+ *
+ * Only first parade states are processed, so this rejects last parade states
+ * and any other session. A message qualifies on either an explicit
+ * "FIRST PARADE" marker or a header timing before 12:00.
+ *
+ * @param {string} text Raw message text.
+ * @returns {boolean} True when the message is a first parade state.
+ */
+export function isFirstParade(text) {
+  const header = extractHeader(text);
+  return FIRST_PARADE_PATTERN.test(header) || hasMorningTiming(header);
+}
+
+/**
+ * Classifies a WhatsApp message as a first parade state or not.
+ *
+ * @param {string} text Raw message text. Non-string or empty input is rejected.
+ * @returns {{accepted: boolean, rejectReason: ?string}} The verdict, plus a
+ *   human-readable reason when rejected.
+ */
+export function isParadeState(text) {
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    return { accepted: false, rejectReason: 'empty message' };
+  }
+  if (!ANCHOR_PATTERN.test(text)) {
+    return { accepted: false, rejectReason: 'missing "parade state" anchor phrase' };
+  }
+
+  const lineCount = countNonEmptyLines(text);
+  if (lineCount < MIN_LINES) {
+    return { accepted: false, rejectReason: `too few lines (${lineCount} < ${MIN_LINES})` };
+  }
+  if (text.length < MIN_CHARS) {
+    return { accepted: false, rejectReason: `too short (${text.length} < ${MIN_CHARS} chars)` };
+  }
+  if (!isFirstParade(text)) {
+    return {
+      accepted: false,
+      rejectReason: 'not a first parade state (no "first parade" marker and no header timing before 12:00)',
+    };
+  }
+
+  return { accepted: true, rejectReason: null };
+}

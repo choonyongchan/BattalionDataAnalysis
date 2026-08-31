@@ -1,0 +1,68 @@
+# Publishes the dashboard to GitHub Pages.
+#
+# Deploy-from-a-branch only offers "/" or "/docs" as the source folder, and "docs/" here
+# already holds the architecture reference — so an Actions workflow is what lets Pages
+# serve "dashboard/". There is no build step: the directory is plain ES modules and CSS,
+# and it is uploaded exactly as it sits in the repo. Its tests live in "test/dashboard/",
+# outside that boundary, for the same reason "test/" sits outside "src/" — what ships is
+# only what runs in the browser.
+#
+# Only code is published, and it carries no secret. The dashboard asks the Apps Script web
+# app for the data at view time, and that endpoint refuses to answer without the password
+# the viewer types — which is held in a script property on the Apps Script side and never
+# reaches this repo. So no battalion data and no credential passes through this workflow,
+# lands in an artifact, or is committed.
+
+name: Deploy dashboard to Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'dashboard/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it: a half-published dashboard is
+# worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      # The model layer is pure and needs no Google account or API key, so the whole suite
+      # runs here — "./test/" covers the parser and the dashboard alike. A classification
+      # or episode regression fails the deploy rather than reaching the CO as a wrong
+      # number. The WhatsApp bridge's own tests are left to their own workflow: they need
+      # that package's dependencies installed and nothing in it ships to Pages.
+      - name: Run tests
+        run: bun test ./test/
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Upload the dashboard directory
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

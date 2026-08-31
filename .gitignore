@@ -1,0 +1,12 @@
+node_modules/
+.clasp.json
+whatsapp/node_modules/
+whatsapp/.env
+whatsapp/auth/
+whatsapp/data/
+
+# Captured group listings hold real group names and JIDs.
+whatsapp/output.txt
+parade-state-example/*
+# Bundled dashboard output from a stray `> nul` redirect on Windows.
+nul

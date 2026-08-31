@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Battalion Personnel Dashboard</title>
+    <meta name="description" content="Daily strength, MC and report-sick picture for battalion S1, S3 and the CO." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#view">Skip to content</a>
+
+    <header class="masthead">
+      <div class="masthead__bar">
+        <p class="signal" id="signal-line">BN PERSONNEL · LOCKED</p>
+        <button class="button button--quiet" id="lock" type="button" hidden>Lock</button>
+      </div>
+      <div class="masthead__main">
+        <h1 class="masthead__title">Battalion Personnel</h1>
+        <ol class="coy-strip" id="coy-strip" aria-label="Companies that have filed a parade state"></ol>
+      </div>
+    </header>
+
+    <!--
+      Five views in a deliberate order: today's picture, then the same three questions
+      asked of each absence type, then one soldier. The three middle tabs share one
+      layout — trend, by company, by platoon, who most often — so the layout is learned
+      once and read three times.
+    -->
+    <nav class="tabs" id="tabs" aria-label="Views">
+      <a class="tab" href="#/today" data-view="today">Today</a>
+      <a class="tab" href="#/mc" data-view="mc">MC</a>
+      <a class="tab" href="#/reportsick" data-view="reportsick">Report sick</a>
+      <a class="tab" href="#/status" data-view="status">Status</a>
+      <a class="tab" href="#/soldier" data-view="soldier">Soldier</a>
+    </nav>
+
+    <!--
+      Two filters, because the data supports two. Session is gone: every parade state in
+      the sheet is a first parade, so a control offering one option is furniture. Window
+      is gone too — the dashboard reads everything ingested, and a window control invited
+      the reader to wonder which slice a figure covered.
+    -->
+    <form class="controls" id="controls" hidden>
+      <label class="control">
+        <span class="control__label">Parade date</span>
+        <select class="control__input" id="control-date"></select>
+      </label>
+      <label class="control">
+        <span class="control__label">Company</span>
+        <select class="control__input" id="control-company"></select>
+      </label>
+    </form>
+
+    <main id="view" class="view" tabindex="-1"></main>
+
+    <section class="gate" id="gate">
+      <div class="gate__panel">
+        <p class="eyebrow">Restricted</p>
+        <h2 class="gate__title">Enter the dashboard password</h2>
+        <p class="gate__body" id="gate-body">
+          The spreadsheet stays private and nothing is published anywhere. The password is
+          checked on the server that holds the data, so a wrong one returns no rows at all.
+        </p>
+        <form class="gate__form" id="gate-form">
+          <label class="gate__label" for="password">Password</label>
+          <input
+            class="gate__input"
+            id="password"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            spellcheck="false"
+          />
+          <button class="button" id="unlock" type="submit">Unlock</button>
+        </form>
+        <p class="gate__error" id="gate-error" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        Reads <span class="mono">Strength Data</span>, <span class="mono">Personnel Data</span>,
+        <span class="mono">Command Roster</span> and the FormSG report-sick tab. NRIC columns are
+        never requested.
+      </p>
+    </footer>
+
+    <!--
+      Pinned to an exact version with Subresource Integrity, so a compromised or swapped
+      CDN file is refused by the browser rather than executed. The hash was computed from
+      the downloaded file and cross-checked against the one cdnjs publishes.
+    -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.6.0/echarts.min.js"
+      integrity="sha512-XSmbX3mhrD2ix5fXPTRQb2FwK22sRMVQTpBP2ac8hX7Dh/605hA2QDegVWiAvZPiXIxOV0CbkmUjGionDpbCmw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

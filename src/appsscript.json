@@ -1,0 +1,22 @@
+{
+  "timeZone": "Asia/Singapore",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [
+      {
+        "menuName": "reprocessPendingRows",
+        "functionName": "reprocessPendingRows"
+      },
+      {
+        "menuName": "formSgNormaliseTimestamps",
+        "functionName": "formSgNormaliseTimestamps"
+      }
+    ]
+  },
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
+}

@@ -1,0 +1,586 @@
+/**
+ * The numbers the dashboard puts on screen.
+ *
+ * Three rules run through this module, each learned from the data rather than assumed:
+ *
+ * **Counts are of soldiers, not rows.** A company that files both FPS and LPS lists the
+ * same absentee twice, so every headcount deduplicates on identity within a date.
+ *
+ * **Comparisons are rates, not counts.** In the labelled examples Braves shows 40 MC
+ * rows against Hercules' 7, which says nothing until divided by strength — Braves is the
+ * larger company. Anything compared across units is expressed as a percentage of the
+ * days that unit was observed.
+ *
+ * **A missing company is stated, never absorbed.** If five of six companies have filed,
+ * the battalion total is a total of five companies and the dashboard says so. A headline
+ * that quietly omits a company is worse than no headline.
+ *
+ * Every function here is pure.
+ */
+
+import { classify, DUTY_CLASS, extractSymptoms, isAbsent, isRestricted } from './classify.js';
+import { identityOf } from './episodes.js';
+import { COMPANIES, UNIT_TYPE_COMPANY } from './schema.js';
+import { toIsoDate, toNumber, toText, weekdayOf } from './normalize.js';
+
+/** @type {number} Absolute z-score at or above which a unit is flagged as an outlier. */
+export const OUTLIER_Z = 2;
+
+/** @type {string} Bucket label for rows that name no platoon. */
+export const UNASSIGNED = 'Unassigned';
+
+/**
+ * Sums a list of numbers, ignoring nulls.
+ * @param {Array<?number>} values Values to sum.
+ * @returns {number} The sum; 0 when the list is empty or all null.
+ */
+function sum_(values) {
+  return values.reduce((total, value) => total + (value === null ? 0 : value), 0);
+}
+
+/**
+ * Lists the distinct parade dates present in a set of rows, most recent last.
+ * @param {Array<!Object>} rows Rows carrying a `date` field.
+ * @returns {string[]} Sorted ISO dates.
+ */
+export function datesPresent(rows) {
+  const dates = new Set();
+  rows.forEach((row) => {
+    const date = toIsoDate(row.date);
+    if (date) {
+      dates.add(date);
+    }
+  });
+  return Array.from(dates).sort();
+}
+
+/**
+ * Lists the sessions filed on a given date, in parade order.
+ * @param {Array<!Object>} rows Rows carrying `date` and `session`.
+ * @param {string} isoDate The date to inspect.
+ * @returns {string[]} Sessions present, FPS before LPS.
+ */
+export function sessionsOn(rows, isoDate) {
+  const present = new Set(
+    rows.filter((row) => toIsoDate(row.date) === isoDate).map((row) => toText(row.session))
+  );
+  return ['FPS', 'LPS'].filter((session) => present.has(session));
+}
+
+/**
+ * Battalion strength for one date and session.
+ *
+ * Sums only `unit_type === 'Company'` rows. Summing platoon rows instead would
+ * double-count against the company total and would silently drop any company that files
+ * no platoon breakdown — Hercules files one line in the samples.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session 'FPS' or 'LPS'.
+ * @returns {!Object} Accountable and present strength, plus which companies reported.
+ */
+export function battalionStrength(strengthRows, isoDate, session) {
+  const rows = strengthRows.filter(
+    (row) =>
+      toIsoDate(row.date) === isoDate &&
+      toText(row.session) === session &&
+      toText(row.unit_type) === UNIT_TYPE_COMPANY
+  );
+
+  const byCompany = new Map();
+  rows.forEach((row) => {
+    byCompany.set(toText(row.company), {
+      company: toText(row.company),
+      strength: toNumber(row.total_strength),
+      present: toNumber(row.total_present),
+    });
+  });
+
+  const reported = Array.from(byCompany.values());
+  const accountable = sum_(reported.map((entry) => entry.strength));
+  const present = sum_(reported.map((entry) => entry.present));
+  const reporting = reported.map((entry) => entry.company);
+
+  return {
+    date: isoDate,
+    session,
+    accountable,
+    present,
+    absent: accountable - present,
+    percentPresent: accountable > 0 ? (present / accountable) * 100 : null,
+    byCompany: reported.sort((a, b) => a.company.localeCompare(b.company)),
+    companiesReporting: reporting,
+    companiesMissing: COMPANIES.filter((company) => !reporting.includes(company)),
+    isComplete: reporting.length === COMPANIES.length,
+  };
+}
+
+/**
+ * Counts distinct soldiers per duty class on one date.
+ *
+ * Deduplicates on identity so a soldier listed in both FPS and LPS counts once. Rows
+ * with neither a 4D nor a name cannot be attributed to a soldier and are counted
+ * separately as `unattributable` rather than dropped.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {?string=} session Session to restrict to, or null for both.
+ * @returns {!Object} Per-class distinct soldier counts and totals.
+ */
+export function dutyCountsOn(personnelRows, isoDate, session) {
+  const rows = personnelRows.filter(
+    (row) => toIsoDate(row.date) === isoDate && (!session || toText(row.session) === session)
+  );
+
+  const seen = new Map();
+  let unattributable = 0;
+  rows.forEach((row) => {
+    const dutyClass = classify(row);
+    const identity = identityOf(row);
+    if (identity.key === '') {
+      unattributable += 1;
+      return;
+    }
+    const bucket = seen.get(dutyClass) || new Set();
+    bucket.add(identity.key);
+    seen.set(dutyClass, bucket);
+  });
+
+  const counts = {};
+  let absentTotal = 0;
+  let restrictedTotal = 0;
+  Object.values(DUTY_CLASS).forEach((dutyClass) => {
+    const size = (seen.get(dutyClass) || new Set()).size;
+    counts[dutyClass] = size;
+    if (isAbsent(dutyClass)) {
+      absentTotal += size;
+    }
+    if (isRestricted(dutyClass)) {
+      restrictedTotal += size;
+    }
+  });
+
+  return { date: isoDate, session: session || null, counts, absentTotal, restrictedTotal, unattributable };
+}
+
+/**
+ * Counts absence person-days per unit and the pax-days each unit was at risk for.
+ *
+ * Pax-days is the denominator that makes units of different sizes comparable: a platoon
+ * of 55 observed over 4 days contributes 220 pax-days, and its absence person-days
+ * divide into that. Company-total rows are excluded from the denominator so a company's
+ * strength is not counted twice.
+ *
+ * `keyOf` decides the grain, which is the only difference between the company and
+ * platoon views — both need the same arithmetic and the same z-score against the
+ * battalion rate.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @param {function(!Object): string} keyOf Groups a row into a unit.
+ * @returns {Array<!Object>} One entry per unit, with rate and z-score.
+ * @private
+ */
+function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
+  const paxDays = new Map();
+  strengthRows
+    .filter((row) => toText(row.unit_type) !== UNIT_TYPE_COMPANY)
+    .forEach((row) => {
+      const key = keyOf(row);
+      paxDays.set(key, (paxDays.get(key) || 0) + (toNumber(row.total_strength) || 0));
+    });
+
+  const personDays = new Map();
+  personnelRows
+    .filter((row) => classify(row) === dutyClass)
+    .forEach((row) => {
+      const key = keyOf(row);
+      const identity = identityOf(row);
+      const date = toIsoDate(row.date);
+      const bucket = personDays.get(key) || new Set();
+      bucket.add(identity.key + '@' + date);
+      personDays.set(key, bucket);
+    });
+
+  const keys = new Set([...paxDays.keys(), ...personDays.keys()]);
+  const rows = Array.from(keys).map((key) => ({
+    key,
+    days: (personDays.get(key) || new Set()).size,
+    paxDays: paxDays.get(key) || 0,
+  }));
+
+  const totalPaxDays = sum_(rows.map((row) => row.paxDays));
+  const battalionRate = totalPaxDays > 0 ? sum_(rows.map((row) => row.days)) / totalPaxDays : 0;
+
+  return rows.map((row) => {
+    // Bound to a local rather than read back as `row.z` inside the same object literal:
+    // there, `row` is still the input row and `row.z` is undefined, which makes
+    // `>= OUTLIER_Z` false for every unit however extreme. Silent, and caught only
+    // because a test pins a known outlier.
+    const z = zScore_(row.days, row.paxDays, battalionRate);
+    return {
+      ...row,
+      per100: row.paxDays > 0 ? (row.days / row.paxDays) * 100 : null,
+      z,
+      // Elevated only, not two-tailed. "Is it localised here?" is a question about units
+      // losing more days than the battalion, and flagging a unit for losing unusually
+      // *few* would put it in a list captioned "worth asking about". The signed z-score
+      // stays on every row, so a low outlier is still visible in the table.
+      isOutlier: z !== null && z >= OUTLIER_Z,
+    };
+  });
+}
+
+/**
+ * Absence rate per company and platoon, with elevated units flagged.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @returns {Array<!Object>} One entry per company/platoon.
+ */
+export function unitRates(personnelRows, strengthRows, dutyClass) {
+  const keyOf = (row) => toText(row.company) + '|' + (toText(row.platoon) || UNASSIGNED);
+  return rateRows_(personnelRows, strengthRows, dutyClass, keyOf)
+    .map((row) => {
+      const [company, platoon] = row.key.split('|');
+      return { ...row, company, platoon };
+    })
+    .sort((a, b) => a.company.localeCompare(b.company) || a.platoon.localeCompare(b.platoon));
+}
+
+/**
+ * Absence rate per company, with elevated companies flagged.
+ *
+ * A separate roll-up rather than a sum of `unitRates`, because the z-score has to be
+ * recomputed at this level: a company's denominator is the sum of its platoons', and a
+ * z-score computed per platoon says nothing about the company that contains them.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
+ * @returns {Array<!Object>} One entry per company, highest rate first.
+ */
+export function companyRates(personnelRows, strengthRows, dutyClass) {
+  return rateRows_(personnelRows, strengthRows, dutyClass, (row) => toText(row.company))
+    .filter((row) => row.key !== '')
+    .map((row) => ({ ...row, company: row.key }))
+    .sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
+}
+
+/**
+ * Scores how far a unit's absence count sits from the battalion rate.
+ *
+ * A normal approximation to the binomial: with n pax-days at battalion rate p, a unit is
+ * expected to lose n*p days with standard deviation sqrt(n*p*(1-p)). This is what
+ * separates "a small platoon had three MCs" from "this platoon is an outlier" — the
+ * former is noise in a small denominator and the z-score says so.
+ * @param {number} days Observed absence person-days.
+ * @param {number} paxDays The unit's pax-days.
+ * @param {number} rate Battalion-wide rate, as a proportion.
+ * @returns {?number} The z-score, or null when there is too little to compare.
+ */
+function zScore_(days, paxDays, rate) {
+  if (paxDays <= 0 || rate <= 0 || rate >= 1) {
+    return null;
+  }
+  const sd = Math.sqrt(paxDays * rate * (1 - rate));
+  return sd > 0 ? (days - paxDays * rate) / sd : null;
+}
+
+/**
+ * The absence reasons shown as a breakdown, in a fixed order.
+ *
+ * `Report Sick` is deliberately absent: it is an event, not a state — a soldier reports
+ * sick and is then on MC, on status, or back on parade. Listing it beside the states
+ * would count the same soldier twice in a breakdown that must sum.
+ * @type {Array<{label: string, dutyClass: string}>}
+ */
+export const ABSENCE_REASONS = [
+  { label: 'MC (Att C)', dutyClass: DUTY_CLASS.MC },
+  { label: 'Duty / course', dutyClass: DUTY_CLASS.OTHERS },
+  { label: 'Medical appt', dutyClass: DUTY_CLASS.MA },
+  { label: 'Off / leave', dutyClass: DUTY_CLASS.OFF_LEAVE },
+];
+
+/**
+ * Composition of accountable strength for one parade: who can be employed today.
+ *
+ * Three parts that always sum to accountable strength, which is what makes this
+ * answerable as one whole:
+ *
+ *   present, full duty  =  present  -  on status
+ *   present, restricted =  on status          (Att B / LD: here, excused some activities)
+ *   absent              =  accountable - present
+ *
+ * `Status` sits inside `present` rather than beside it. Folding it into absence would be
+ * the single most misleading thing this dashboard could do — those soldiers are on
+ * parade — so it is shown as its own part of the present block.
+ *
+ * The strength lines are authoritative for present and absent; the absentee list is
+ * authoritative for reasons. The two are written by hand and need not agree, so the
+ * difference is reported as `unaccounted` rather than hidden by trusting one of them.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session Parade session.
+ * @returns {!Object} The three parts, the named absence reasons, and the residual.
+ */
+export function employability(strengthRows, personnelRows, isoDate, session) {
+  const strength = battalionStrength(strengthRows, isoDate, session);
+  const duty = dutyCountsOn(personnelRows, isoDate, session);
+
+  // Capped at present: a status count exceeding the present figure would drive
+  // "full duty" negative, and a negative slice cannot be drawn or believed.
+  const restricted = Math.min(duty.restrictedTotal, strength.present);
+  const reasons = ABSENCE_REASONS.map((reason) => ({
+    label: reason.label,
+    dutyClass: reason.dutyClass,
+    count: duty.counts[reason.dutyClass] || 0,
+  }));
+  const named = sum_(reasons.map((reason) => reason.count));
+
+  return {
+    date: isoDate,
+    accountable: strength.accountable,
+    present: strength.present,
+    presentFull: strength.present - restricted,
+    restricted,
+    absent: strength.absent,
+    percentPresent: strength.percentPresent,
+    reasons,
+    named,
+    // Positive: absentees the strength lines count but the absentee list does not name.
+    // Negative: more names than the strength gap accounts for.
+    unaccounted: strength.absent - named,
+    companiesReporting: strength.companiesReporting,
+    companiesMissing: strength.companiesMissing,
+    isComplete: strength.isComplete,
+  };
+}
+
+/**
+ * Per-company strength and absence mix for one parade.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session Parade session.
+ * @returns {Array<!Object>} One entry per reporting company, weakest first.
+ */
+export function companyBreakdown(strengthRows, personnelRows, isoDate, session) {
+  const strength = battalionStrength(strengthRows, isoDate, session);
+
+  return strength.byCompany
+    .map((entry) => {
+      const rows = personnelRows.filter((row) => toText(row.company) === entry.company);
+      const duty = dutyCountsOn(rows, isoDate, session);
+      const reasons = {};
+      ABSENCE_REASONS.forEach((reason) => {
+        reasons[reason.dutyClass] = duty.counts[reason.dutyClass] || 0;
+      });
+      const absent = (entry.strength || 0) - (entry.present || 0);
+      return {
+        company: entry.company,
+        strength: entry.strength,
+        present: entry.present,
+        absent,
+        percentPresent: entry.strength > 0 ? (entry.present / entry.strength) * 100 : null,
+        percentAbsent: entry.strength > 0 ? (absent / entry.strength) * 100 : null,
+        status: duty.counts[DUTY_CLASS.STATUS] || 0,
+        reasons,
+        named: sum_(Object.values(reasons)),
+        // Signed, not clamped. Cougar names more absentees than its strength gap
+        // accounts for in the labelled data, and clamping that to zero would hide a
+        // real disagreement between two hand-written parts of the same message.
+        unaccounted: absent - sum_(Object.values(reasons)),
+      };
+    })
+    .sort((a, b) => (a.percentPresent || 0) - (b.percentPresent || 0));
+}
+
+/**
+ * One duty class counted per parade date, as a headcount and as a percentage.
+ *
+ * The rate is what a trend needs: a rising count across a month when the battalion is
+ * also growing says nothing on its own.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {string} dutyClass Duty class to trend, from DUTY_CLASS.
+ * @param {string} session Parade session.
+ * @returns {Array<!Object>} One entry per date, oldest first.
+ */
+export function categoryTrend(personnelRows, strengthRows, dutyClass, session) {
+  return datesPresent(strengthRows).map((date) => {
+    const strength = battalionStrength(strengthRows, date, session);
+    const duty = dutyCountsOn(personnelRows, date, session);
+    const count = duty.counts[dutyClass] || 0;
+    return {
+      date,
+      count,
+      accountable: strength.accountable,
+      per100: strength.accountable > 0 ? (count / strength.accountable) * 100 : null,
+      isComplete: strength.isComplete,
+      companiesReporting: strength.companiesReporting.length,
+    };
+  });
+}
+
+/**
+ * Soldiers with the most episodes of one duty class.
+ *
+ * Ranked by number of separate episodes, then by days lost. Deliberately plain
+ * arithmetic: it reports what was recorded and infers nothing about why, which is the
+ * only claim a parade state can support. A soldier managing a chronic condition and a
+ * soldier avoiding training appear the same way here, and the difference is a
+ * conversation, not a number.
+ * @param {Array<!Object>} episodes Episodes to rank.
+ * @param {string} dutyClass Duty class to rank, from DUTY_CLASS.
+ * @returns {Array<!Object>} One entry per soldier, most episodes first.
+ */
+export function leaderboard(episodes, dutyClass) {
+  const bySoldier = new Map();
+  episodes
+    .filter((episode) => episode.dutyClass === dutyClass)
+    .forEach((episode) => {
+      const entry = bySoldier.get(episode.key) || {
+        key: episode.key,
+        fourD: episode.fourD,
+        name: episode.name,
+        rank: episode.rank,
+        company: episode.company,
+        platoon: episode.platoon || UNASSIGNED,
+        episodes: 0,
+        daysLost: 0,
+        lastStart: null,
+      };
+      entry.episodes += 1;
+      entry.daysLost += episode.daysLost;
+      entry.name = episode.name || entry.name;
+      entry.company = episode.company || entry.company;
+      if (!entry.lastStart || (episode.startDate && episode.startDate > entry.lastStart)) {
+        entry.lastStart = episode.startDate;
+      }
+      bySoldier.set(episode.key, entry);
+    });
+
+  return Array.from(bySoldier.values()).sort(
+    (a, b) => b.episodes - a.episodes || b.daysLost - a.daysLost
+  );
+}
+
+/**
+ * The most common reasons given for one duty class on one date.
+ *
+ * Answers "what are they reporting sick with today", which a bare count cannot. Reads
+ * the symptom lexicon first and falls back to the raw reason text, so a wording the
+ * lexicon has not learned still appears rather than vanishing into an "other" bucket.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session Parade session.
+ * @param {string} dutyClass Duty class to read, from DUTY_CLASS.
+ * @param {number=} limit How many to return; defaults to 3.
+ * @returns {Array<{label: string, count: number}>} Reasons, most common first.
+ */
+export function topReasonsOn(personnelRows, isoDate, session, dutyClass, limit) {
+  const counts = new Map();
+  personnelRows
+    .filter(
+      (row) =>
+        toIsoDate(row.date) === isoDate &&
+        toText(row.session) === session &&
+        classify(row) === dutyClass
+    )
+    .forEach((row) => {
+      const symptoms = extractSymptoms(row.reason);
+      const labels = symptoms.length > 0 ? symptoms : [];
+      labels.forEach((label) => counts.set(label, (counts.get(label) || 0) + 1));
+    });
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, limit || 3);
+}
+
+/**
+ * Distribution of episode start dates across the days of the week.
+ *
+ * The bridge-day question: absences clustering on Mondays and Fridays behave differently
+ * from absences spread evenly, and the difference is visible only once start dates are
+ * counted per weekday rather than per calendar date.
+ * @param {Array<!Object>} episodes Episodes to count.
+ * @returns {Array<{name: string, count: number}>} Counts, Monday first.
+ */
+export function weekdayDistribution(episodes) {
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  episodes.forEach((episode) => {
+    if (episode.startDate) {
+      counts[weekdayOf(episode.startDate).index] += 1;
+    }
+  });
+  return names.map((name, index) => ({ name, count: counts[index] }));
+}
+
+/**
+ * Distribution of episode durations, in whole days.
+ * @param {Array<!Object>} episodes Episodes to count.
+ * @returns {Array<{days: number, count: number}>} Counts by duration, shortest first.
+ */
+export function durationDistribution(episodes) {
+  const counts = new Map();
+  episodes.forEach((episode) => {
+    const days = Math.max(1, Math.round(episode.daysLost));
+    counts.set(days, (counts.get(days) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([days, count]) => ({ days, count }))
+    .sort((a, b) => a.days - b.days);
+}
+
+/**
+ * Counts how often each symptom appears, and how much of the data said anything at all.
+ *
+ * Coverage travels with the counts because it is low in the parade state — only 16 of
+ * 61 `Att C` rows in the labelled examples carry a symptom, the rest being a bare "MC".
+ * A symptom chart drawn over a quarter of the episodes would otherwise read as the whole
+ * picture.
+ * @param {Array<!Object>} episodes Episodes carrying a `symptoms` array.
+ * @returns {!Object} Sorted symptom counts plus the share of episodes that named one.
+ */
+export function symptomCounts(episodes) {
+  const counts = new Map();
+  let described = 0;
+  episodes.forEach((episode) => {
+    if (episode.symptoms.length > 0) {
+      described += 1;
+    }
+    episode.symptoms.forEach((symptom) => counts.set(symptom, (counts.get(symptom) || 0) + 1));
+  });
+
+  return {
+    counts: Array.from(counts.entries())
+      .map(([symptom, count]) => ({ symptom, count }))
+      .sort((a, b) => b.count - a.count || a.symptom.localeCompare(b.symptom)),
+    described,
+    total: episodes.length,
+    coverage: episodes.length > 0 ? described / episodes.length : null,
+  };
+}
+
+/**
+ * Measures how complete the personnel data is on the fields the dashboard depends on.
+ *
+ * Surfaced as a badge rather than kept quiet: an "unassigned" bar in the platoon heatmap
+ * means something different when 5% of rows lack a platoon than when 40% do, and the
+ * viewer cannot tell which without this.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @returns {!Object} Row count and the share present for each key field.
+ */
+export function dataQuality(personnelRows) {
+  const total = personnelRows.length;
+  const share = (predicate) => (total > 0 ? personnelRows.filter(predicate).length / total : null);
+  return {
+    total,
+    platoon: share((row) => toText(row.platoon) !== ''),
+    fourD: share((row) => toText(row.four_d) !== ''),
+    startDate: share((row) => toIsoDate(row.start_date) !== null),
+    numDays: share((row) => toNumber(row.num_days) !== null),
+  };
+}
