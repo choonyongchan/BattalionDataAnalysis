@@ -149,9 +149,15 @@ Two consequences of that direction:
   arrangement is that a commander learns it once and reads it three times.
 - **Chart colour is validated, not chosen.** The categorical palette is capped at four
   slots because that is what clears the adjacent CVD gates on this surface; forms where
-  any two series can be compared directly are capped at three. A composition chart is
-  drawn only where the parts genuinely sum to the whole it names, which is why the
-  employability donut has three slices and the absence breakdown is a bar chart.
+  any two series can be compared directly are capped at three. Where a form needs more
+  parts than that, the extra parts take the neutral ramp rather than an invented hue: the
+  strength donut has seven slices because it spends colour only on the four that are
+  absent, and the three on parade sit in greys validated as an ordinal ramp instead.
+- **A composition chart is drawn only where the parts sum to the whole it names.** The
+  strength donut earns that by construction — `strengthMix` gives every soldier exactly
+  one of the sheet's categories, by a documented precedence, and makes `Full duty` the
+  residual. Where two hand-written parts of the same message disagree, both figures reach
+  the screen: the donut states the strength line's own present count beside its own.
 - **A date crosses the boundary as text, in the spreadsheet's timezone.**
   `DashboardFeed.toJsonValue_` formats it; `JSON.stringify` would render a Date in UTC and
   slide every Singapore parade state back a day. That failure mode errors nowhere — the

@@ -120,15 +120,25 @@ function headcountCard_(view, spec) {
   return chartCard({
     title: spec.full + ' over time',
     render: (node) =>
-      barChart(node, {
-        horizontal: false,
-        categories: trend.map((point) => fmtDate(point.date)),
-        values: trend.map((point) => point.count),
+      lineChart(node, {
+        dates: trend.map((point) => fmtDate(point.date)),
+        // Null, not zero, where nothing was filed. A parade with no strength line is a
+        // parade nobody counted, and plotting it as zero would draw a headcount that
+        // dropped to none — the one reading the data cannot support.
+        series: [
+          {
+            name: 'soldiers',
+            values: trend.map((point) => (point.accountable === 0 ? null : point.count)),
+          },
+        ],
         valueName: 'soldiers',
       }),
     table: {
       columns: [{ label: 'Parade' }, { label: 'Soldiers', numeric: true }],
-      rows: trend.map((point) => [fmtDate(point.date), fmtInt(point.count)]),
+      rows: trend.map((point) => [
+        fmtDate(point.date),
+        point.accountable === 0 ? '—' : fmtInt(point.count),
+      ]),
     },
   });
 }
@@ -220,10 +230,10 @@ function platoonCard_(view, spec) {
 
   const outliers = rates.filter((row) => row.isOutlier);
 
-  // The heatmap is only as good as its attribution: rows with no platoon land in the
-  // Unassigned column, and if that is most of them the grid is not evidence of anything.
-  // Stated as one number rather than a paragraph, and only when it is bad enough to
-  // change how the chart should be read.
+  // The heatmap is only as good as its attribution. Rows naming no platoon are not on
+  // the grid at all — there is no honest column for them — so the share that named none
+  // is the reader's only measure of how much of the battalion this picture covers.
+  // Stated as one number, and only when it is bad enough to change how to read the grid.
   const quality = dataQuality(view.personnel);
   const thin = quality.platoon !== null && quality.platoon < 0.9;
 
@@ -232,7 +242,7 @@ function platoonCard_(view, spec) {
       title: spec.title + ' rate by platoon',
       note:
         'Dot: above ' + OUTLIER_Z + ' SD.' +
-        (thin ? ' ' + fmtShare(1 - quality.platoon) + ' name no platoon.' : ''),
+        (thin ? ' ' + fmtShare(1 - quality.platoon) + ' named no platoon, and are not here.' : ''),
       height: 'chart--tall',
       render: (node) =>
         heatmap(node, {
@@ -340,8 +350,11 @@ function leaderboardCard_(view, spec) {
         { label: 'Soldier' },
         { label: 'Coy' },
         { label: 'Plt' },
-        { label: 'Episodes', numeric: true },
-        { label: 'Days', numeric: true },
+        { label: spec.countLabel, numeric: true },
+        // Cumulative: `leaderboard` sums `daysLost` over only this soldier's episodes of
+        // this one category, so an MC row is the days that soldier was away on Att C and
+        // nothing else.
+        { label: spec.daysLabel, numeric: true },
         { label: 'Latest' },
       ],
       shown.map((entry) => [

@@ -20,6 +20,9 @@
 /** @type {!Object<string, string>} Palette roles, read from the stylesheet. */
 const COLOR = readPalette_();
 
+/** @type {number} Slices below this share of the whole carry no direct label. */
+const LABEL_MIN_PERCENT = 3;
+
 /** @type {Array<!Object>} Live chart instances, resized together. */
 const instances = [];
 
@@ -43,6 +46,11 @@ function readPalette_() {
       read('--series-3', '#199e70'),
       read('--series-4', '#c98500'),
     ],
+    neutral: [
+      read('--neutral-1', '#514f4b'),
+      read('--neutral-2', '#77766d'),
+      read('--neutral-3', '#9d9c92'),
+    ],
     sequential: [
       read('--seq-1', '#104281'),
       read('--seq-2', '#1c5cab'),
@@ -52,6 +60,17 @@ function readPalette_() {
     ],
     critical: read('--critical', '#d03b3b'),
   };
+}
+
+/**
+ * The palette, for views that assign a colour per mark rather than per series.
+ *
+ * Exposed rather than duplicated in the views, so the stylesheet stays the one place a
+ * colour is written down.
+ * @returns {!Object<string, *>} Palette roles to values.
+ */
+export function palette() {
+  return COLOR;
 }
 
 /**
@@ -296,7 +315,11 @@ export function lineChart(node, spec) {
       showSymbol: spec.dates.length <= 45,
       lineStyle: { width: 2, color: COLOR.series[index % COLOR.series.length] },
       itemStyle: { color: COLOR.series[index % COLOR.series.length], borderColor: COLOR.surface, borderWidth: 2 },
-      connectNulls: false,
+      // Bridged, not broken. A parade nobody filed leaves a hole in the series, and a
+      // gapped line reads as the rate having dropped to nothing rather than as an
+      // unfiled day. The straight segment across a gap is an interpolation, so the
+      // point itself is left unmarked and the table twin shows the day as '—'.
+      connectNulls: true,
     })),
   });
 }
@@ -399,6 +422,11 @@ export function heatmap(node, spec) {
  */
 export function donutChart(node, spec) {
   const total = spec.slices.reduce((sum, slice) => sum + (slice.value || 0), 0);
+  // A card wide enough to seat the legend beside the ring rather than under it. Below
+  // this the legend goes back to a row underneath, which is the only thing that fits on
+  // a phone.
+  const wide = node.clientWidth >= 620;
+  const centre = wide ? ['42%', '50%'] : ['50%', '44%'];
 
   return mount_(node, {
     ...base_(),
@@ -413,8 +441,9 @@ export function donutChart(node, spec) {
         ].filter(Boolean)),
     },
     legend: {
-      bottom: 0,
-      left: 'center',
+      ...(wide
+        ? { orient: 'vertical', right: '18%', top: 'middle', itemGap: 10 }
+        : { bottom: 0, left: 'center' }),
       itemWidth: 10,
       itemHeight: 10,
       icon: 'roundRect',
@@ -424,8 +453,8 @@ export function donutChart(node, spec) {
       {
         type: 'pie',
         // A ring, not a pie: the hole carries the total.
-        radius: ['52%', '76%'],
-        center: ['50%', '44%'],
+        radius: ['50%', '74%'],
+        center: centre,
         avoidLabelOverlap: true,
         padAngle: 1.2,
         itemStyle: { borderColor: COLOR.surface, borderWidth: 2, borderRadius: 2 },
@@ -435,20 +464,35 @@ export function donutChart(node, spec) {
         label: {
           color: COLOR.secondary,
           fontSize: 11,
+          // A slice thinner than this cannot hold a leader line without its label
+          // landing on its neighbour's. Below the cut the slice keeps its colour, its
+          // legend entry, its tooltip and its row in the table twin — it stops
+          // competing only for the space it does not have. Off/leave is 6 soldiers of
+          // 738 in the real data, and labelling it costs two larger slices their
+          // position.
           formatter: (params) =>
             node.clientWidth < 420
               ? fmtCount_(params.value)
               : params.name + '\n' + fmtCount_(params.value),
         },
         labelLine: { lineStyle: { color: COLOR.rule }, length: 8, length2: 8 },
-        data: spec.slices.map((slice, index) => ({
-          name: slice.name,
-          value: slice.value,
-          itemStyle: { color: COLOR.series[index % COLOR.series.length] },
-        })),
+        data: spec.slices.map((slice, index) => {
+          // Set on the item, not in the formatter: returning an empty string still
+          // reserves the label's slot and still draws its leader line, which lands on
+          // the chart as a stub pointing at nothing.
+          const labelled =
+            total > 0 && ((slice.value || 0) / total) * 100 >= LABEL_MIN_PERCENT;
+          return {
+            name: slice.name,
+            value: slice.value,
+            label: { show: labelled },
+            labelLine: { show: labelled },
+            itemStyle: { color: slice.color || COLOR.series[index % COLOR.series.length] },
+          };
+        }),
       },
     ],
-    graphic: total > 0 ? centreLabel_(spec.centreLabel, total) : undefined,
+    graphic: total > 0 ? centreLabel_(spec.centreLabel, total, centre) : undefined,
   });
 }
 
@@ -458,12 +502,17 @@ export function donutChart(node, spec) {
  * @param {number} total The total.
  * @returns {Array<!Object>} ECharts graphic elements.
  */
-function centreLabel_(label, total) {
+function centreLabel_(label, total, centre) {
+  // Anchored to the ring's own centre, not to the canvas. When the legend moves to the
+  // right the ring slides left with it, and a canvas-centred total would sit off the
+  // hole and over the slices.
+  const x = centre[0];
+  const y = parseFloat(centre[1]);
   return [
     {
       type: 'text',
-      left: 'center',
-      top: '38%',
+      left: x,
+      top: y - 7 + '%',
       silent: true,
       style: {
         text: fmtCount_(total),
@@ -474,8 +523,8 @@ function centreLabel_(label, total) {
     },
     {
       type: 'text',
-      left: 'center',
-      top: '48%',
+      left: x,
+      top: y + 3 + '%',
       silent: true,
       style: {
         text: label || '',

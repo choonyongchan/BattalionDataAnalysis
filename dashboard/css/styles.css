@@ -43,6 +43,16 @@
   --series-3: #199e70;
   --series-4: #c98500;
 
+  /* Neutral ramp, dark steps. Not categorical slots: these carry the parts of the
+     battalion that are ON parade, where the point is that they are unremarkable. Colour
+     is spent only on the soldiers who are missing, so the coloured arc of the strength
+     donut *is* the answer to "who is not here". Validated as an ordinal ramp (monotone
+     lightness, adjacent OKLCH dL >= 0.06, light end 2.13:1 on --surface-1), not against
+     the categorical gates, which a grey by definition cannot clear. */
+  --neutral-1: #514f4b;
+  --neutral-2: #77766d;
+  --neutral-3: #9d9c92;
+
   /* Status. Reserved for state; always paired with a word, never colour alone. */
   --good: #0ca30c;
   --warning: #fab219;

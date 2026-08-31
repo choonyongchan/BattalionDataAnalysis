@@ -107,6 +107,20 @@ export const FORBIDDEN_HEADERS = ['SingPass Validated NRIC', 'Masked NRIC'];
 export const COMPANIES = ['Archer', 'Braves', 'Cougar', 'Stallion', 'Scorpion', 'Hercules'];
 
 /**
+ * The platoons a per-platoon rate is drawn for.
+ *
+ * A company's Strength Data also carries a command element ("COMMANDERS") and its own
+ * total row, and 18% of personnel rows in the labelled data name no platoon at all.
+ * None of those is a platoon, and putting them on a platoon axis produces columns that
+ * cannot be compared with the rest — a command element of 25 beside a platoon of 55, and
+ * an "Unassigned" column that is an artefact of how the message was typed rather than a
+ * place in the battalion. Rates are therefore computed over this roll only, on both
+ * sides of the fraction, and the share of rows naming no platoon is stated on the chart.
+ * @type {string[]}
+ */
+export const PLATOONS = ['1', '2', '3', '4', 'HQ'];
+
+/**
  * Allowed parade sessions: first parade of the day, and last.
  * @type {string[]}
  */

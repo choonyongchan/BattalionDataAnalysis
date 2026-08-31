@@ -20,7 +20,7 @@
 
 import { classify, DUTY_CLASS, extractSymptoms, isAbsent, isRestricted } from './classify.js';
 import { identityOf } from './episodes.js';
-import { COMPANIES, UNIT_TYPE_COMPANY } from './schema.js';
+import { COMPANIES, PLATOONS, UNIT_TYPE_COMPANY } from './schema.js';
 import { toIsoDate, toNumber, toText, weekdayOf } from './normalize.js';
 
 /** @type {number} Absolute z-score at or above which a unit is flagged as an outlier. */
@@ -231,14 +231,26 @@ function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
 
 /**
  * Absence rate per company and platoon, with elevated units flagged.
+ *
+ * Restricted to the `PLATOONS` roll on both sides of the fraction. Filtering the inputs
+ * rather than the output is what keeps the z-score honest: the battalion rate this
+ * scores against has to be the rate among the platoons being compared, and leaving a
+ * command element's pax-days or a company's unattributed absences in the baseline would
+ * measure each platoon against a battalion it is not part of.
  * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
  * @param {Array<!Object>} strengthRows Normalised Strength Data records.
  * @param {string} dutyClass Duty class to measure, from DUTY_CLASS.
- * @returns {Array<!Object>} One entry per company/platoon.
+ * @returns {Array<!Object>} One entry per company/platoon on the roll.
  */
 export function unitRates(personnelRows, strengthRows, dutyClass) {
-  const keyOf = (row) => toText(row.company) + '|' + (toText(row.platoon) || UNASSIGNED);
-  return rateRows_(personnelRows, strengthRows, dutyClass, keyOf)
+  const onRoll = (row) => PLATOONS.indexOf(toText(row.platoon)) >= 0;
+  const keyOf = (row) => toText(row.company) + '|' + toText(row.platoon);
+  return rateRows_(
+    personnelRows.filter(onRoll),
+    strengthRows.filter(onRoll),
+    dutyClass,
+    keyOf
+  )
     .map((row) => {
       const [company, platoon] = row.key.split('|');
       return { ...row, company, platoon };
@@ -349,6 +361,168 @@ export function employability(strengthRows, personnelRows, isoDate, session) {
     // Positive: absentees the strength lines count but the absentee list does not name.
     // Negative: more names than the strength gap accounts for.
     unaccounted: strength.absent - named,
+    companiesReporting: strength.companiesReporting,
+    companiesMissing: strength.companiesMissing,
+    isComplete: strength.isComplete,
+  };
+}
+
+/**
+ * The sheet's own categories, in the fixed order the strength donut draws them.
+ *
+ * Order is part of the contract, not a presentation detail. The slices are drawn round
+ * the ring in this sequence and take their colour from their position, so a category
+ * keeps its colour whatever its size that day — the alternative, colouring by rank,
+ * repaints every slice as soon as one company files.
+ *
+ * The sequence is also the story: the three that are on parade first, then the four that
+ * are not, so the ring reads as one arc of present and one arc of absent rather than
+ * seven unrelated wedges.
+ *
+ * `Full duty` carries no category because it is the residual — the soldiers the parade
+ * state files nothing about, who are therefore on full duty.
+ * @type {Array<{label: string, dutyClass: ?string, here: boolean}>}
+ */
+export const PARADE_MIX = [
+  { label: 'Full duty', dutyClass: null, here: true },
+  { label: 'Duty / course', dutyClass: DUTY_CLASS.OTHERS, here: true },
+  { label: 'Att B / LD', dutyClass: DUTY_CLASS.STATUS, here: true },
+  { label: 'Att C', dutyClass: DUTY_CLASS.MC, here: false },
+  { label: 'Report sick', dutyClass: DUTY_CLASS.REPORT_SICK, here: false },
+  { label: 'MA', dutyClass: DUTY_CLASS.MA, here: false },
+  { label: 'Off / leave', dutyClass: DUTY_CLASS.OFF_LEAVE, here: false },
+];
+
+/**
+ * Which category wins when one soldier is filed under several on the same date.
+ *
+ * The real data needs this and a naive count gets it wrong: in the labelled examples
+ * Archer files twelve soldiers under two or three categories at once — one under Status,
+ * MA and Report Sick together — and 235 rows resolve to 201 soldiers. Counting rows
+ * would inflate a whole-strength breakdown past the strength it is drawn against.
+ *
+ * Absence outranks presence, and within absence the longer commitment outranks the
+ * shorter: a soldier on MC who also has an appointment logged is on MC. `Status` ranks
+ * last because it is the one class that does not stop a soldier being somewhere else.
+ * @type {string[]}
+ */
+const MIX_PRECEDENCE = [
+  DUTY_CLASS.MC,
+  DUTY_CLASS.OFF_LEAVE,
+  DUTY_CLASS.MA,
+  DUTY_CLASS.REPORT_SICK,
+  DUTY_CLASS.OTHERS,
+  DUTY_CLASS.STATUS,
+];
+
+/**
+ * Assigns each soldier on a date to exactly one category, by precedence.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session Parade session.
+ * @returns {!Object} Per-category distinct soldier counts, plus the uncategorised count.
+ * @private
+ */
+function soleCategoryCounts_(personnelRows, isoDate, session) {
+  // -1 marks a soldier seen only under a category this dashboard does not know, which
+  // is how an upstream enum change arrives. They are counted rather than dropped, so a
+  // rename upstream shows up as a stated figure instead of quietly swelling `Full duty`.
+  const best = new Map();
+  personnelRows
+    .filter((row) => toIsoDate(row.date) === isoDate && toText(row.session) === session)
+    .forEach((row) => {
+      const identity = identityOf(row);
+      if (identity.key === '') {
+        return;
+      }
+      const rank = MIX_PRECEDENCE.indexOf(classify(row));
+      const current = best.get(identity.key);
+      if (current === undefined || (rank >= 0 && (current === -1 || rank < current))) {
+        best.set(identity.key, rank);
+      }
+    });
+
+  const counts = {};
+  MIX_PRECEDENCE.forEach((dutyClass) => {
+    counts[dutyClass] = 0;
+  });
+  let unknown = 0;
+  best.forEach((rank) => {
+    if (rank < 0) {
+      unknown += 1;
+    } else {
+      counts[MIX_PRECEDENCE[rank]] += 1;
+    }
+  });
+  return { counts, unknown };
+}
+
+/**
+ * Accountable strength split by the sheet's own reason categories.
+ *
+ * Every soldier lands in exactly one slice and the slices sum to accountable strength,
+ * which is what lets this be drawn as a whole. Two things make that true rather than
+ * assumed:
+ *
+ * - **One category per soldier**, by `MIX_PRECEDENCE`. Without it the same soldier is
+ *   counted under Status and MA and Report Sick, and the parts exceed the whole.
+ * - **`Full duty` is the residual**, not a figure of its own: accountable strength less
+ *   everyone the parade state filed a reason for. Soldiers filed under a category this
+ *   dashboard does not recognise fall in here too, and are counted separately as
+ *   `unknown` so the view can say so rather than let them pass as full duty.
+ *
+ * What it deliberately does not claim: that this present/absent split equals the one on
+ * the strength line. It usually does not. `Others` is the reason — the category holds
+ * guard duty, which is served in camp and counted present, alongside medical-centre
+ * appointments, which are not, and the sheet records no `in_camp` value to separate them
+ * (80 of 86 `Others` rows in the labelled data leave it blank). So the two figures are
+ * both reported and their difference is returned as `parity`, for the view to state
+ * rather than reconcile by picking a favourite.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records.
+ * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
+ * @param {string} isoDate Parade date.
+ * @param {string} session Parade session.
+ * @returns {!Object} The slices, the totals they roll up to, and the strength-line gap.
+ */
+export function strengthMix(strengthRows, personnelRows, isoDate, session) {
+  const strength = battalionStrength(strengthRows, isoDate, session);
+  const { counts, unknown } = soleCategoryCounts_(personnelRows, isoDate, session);
+
+  const filed = PARADE_MIX.filter((entry) => entry.dutyClass !== null).map((entry) => ({
+    ...entry,
+    count: counts[entry.dutyClass] || 0,
+  }));
+  const named = sum_(filed.map((entry) => entry.count));
+
+  // Clamped, because a company can file an absentee list without a strength line and
+  // drive this negative. A negative slice cannot be drawn; the shortfall is reported as
+  // `overflow` so the view can say the parts outrun the whole instead of hiding it.
+  const fullDuty = Math.max(0, strength.accountable - named);
+  const overflow = Math.max(0, named - strength.accountable);
+
+  const slices = PARADE_MIX.map((entry) =>
+    entry.dutyClass === null
+      ? { ...entry, count: fullDuty }
+      : { ...entry, count: counts[entry.dutyClass] || 0 }
+  );
+
+  const here = sum_(slices.filter((slice) => slice.here).map((slice) => slice.count));
+  const away = sum_(slices.filter((slice) => !slice.here).map((slice) => slice.count));
+
+  return {
+    date: isoDate,
+    session,
+    accountable: strength.accountable,
+    slices,
+    here,
+    away,
+    named,
+    unknown,
+    overflow,
+    // Signed. Positive: this breakdown puts more soldiers on parade than the strength
+    // line does. The two are written by hand in different parts of the same message.
+    parity: strength.present === null ? null : here - strength.present,
+    presentLine: strength.present,
     companiesReporting: strength.companiesReporting,
     companiesMissing: strength.companiesMissing,
     isComplete: strength.isComplete,

@@ -56,6 +56,11 @@ const CATEGORIES = {
     title: 'MC',
     full: 'MC (Att C)',
     noun: 'MC',
+    // The repeat table counts episodes and sums the days they cost. Both columns are
+    // named after the category rather than after the model, because "3 episodes, 11
+    // days" means nothing to a commander until it reads "3 Att C, 11 days away".
+    countLabel: '# Att C',
+    daysLabel: 'Days away',
     // Att C is excused all duties, so an MC day is a day of strength the battalion
     // does not have. That is why this view leads on days lost, where the other two
     // lead on headcount.
@@ -68,6 +73,8 @@ const CATEGORIES = {
     title: 'Report sick',
     full: 'Report sick',
     noun: 'report sick',
+    countLabel: '# Report sick',
+    daysLabel: 'Days',
     countsDays: false,
     showReasons: true,
   },
@@ -77,6 +84,8 @@ const CATEGORIES = {
     title: 'Status',
     full: 'Status (Att B / LD)',
     noun: 'status',
+    countLabel: '# Status',
+    daysLabel: 'Days on status',
     countsDays: true,
     presentButRestricted: true,
   },

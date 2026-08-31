@@ -4,16 +4,19 @@
  * The story this view tells, in order, is the one a commander asks it in:
  *
  *   1. How many do I have, and how many turned up?      — the tiles
- *   2. Of those here, how many can I actually employ?   — the donut
- *   3. Why is the rest missing?                         — the reason bars
- *   4. Which company is thin, and why?                  — the stacked bars
+ *   2. Where is every one of them?                      — the donut
+ *   3. Which company is thin, and why?                  — the stacked bars
  *
- * Two things it refuses to do, because the alternative misleads:
+ * Three things it refuses to do, because the alternative misleads:
  *
  * - **No battalion total without saying how many companies it covers.** Four of six
  *   filing produces correct arithmetic and a wrong impression.
  * - **Status is never folded into absence.** Attend B and light duty turned up and can
  *   work with limits, so they sit inside the present block, labelled as present.
+ * - **No soldier counted twice.** The donut is drawn against accountable strength, so
+ *   every slice has to be a slice of the same whole; `strengthMix` gives each soldier
+ *   one category, and the card states the strength line's own figure beside it when the
+ *   two disagree.
  */
 
 import { DUTY_CLASS } from '../model/classify.js';
@@ -22,9 +25,10 @@ import {
   companyBreakdown,
   dutyCountsOn,
   employability,
+  strengthMix,
   topReasonsOn,
 } from '../model/metrics.js';
-import { barChart, donutChart, stackedBarChart } from '../charts.js';
+import { barChart, donutChart, palette, stackedBarChart } from '../charts.js';
 import {
   banner,
   chartCard,
@@ -106,54 +110,105 @@ function tiles_(view) {
 }
 
 /**
- * How many are here: three parts that sum to accountable strength.
+ * Colour for each slice of the strength donut, in `PARADE_MIX` order.
+ *
+ * Colour is spent on one thing here: being missing. The three slices that are on parade
+ * take the neutral ramp, so the whole present block reads as one quiet mass and the eye
+ * goes straight to the coloured arc, which is the question the card asks. That also
+ * keeps the categorical palette inside the four adjacent-safe slots it actually has —
+ * seven distinct hues do not exist on this surface, and the sequence below is the
+ * ordering the validator scored best (worst adjacent pair protan ΔE 9.4, tritan 21.9).
+ * @returns {string[]} Hex colours, one per slice.
+ */
+function mixColors_() {
+  const theme = palette();
+  return [
+    theme.neutral[0], // Full duty — the largest slice, so the quietest step
+    theme.neutral[1], // Duty / course
+    theme.neutral[2], // Att B / LD
+    theme.series[1], // Att C
+    theme.series[0], // Report sick
+    theme.series[3], // MA
+    theme.series[2], // Off / leave
+  ];
+}
+
+/**
+ * Accountable strength split by the sheet's own categories.
  * @param {!Object} view The snapshot.
  * @returns {!HTMLElement} The card.
  */
-function employabilityCard_(view) {
-  const now = employability(view.strength, view.personnel, view.date, view.session);
-  const slices = [
-    { name: 'Full duty', value: now.presentFull },
-    { name: 'Present, restricted', value: now.restricted },
-    { name: 'Absent', value: now.absent },
-  ];
+function strengthMixCard_(view) {
+  const mix = strengthMix(view.strength, view.personnel, view.date, view.session);
+  const colors = mixColors_();
+  const share = (count) =>
+    mix.accountable > 0 ? fmtDecimal((count / mix.accountable) * 100, '%') : '—';
+
+  // The strength line and the absentee list are written by hand in different parts of
+  // the same message and need not agree. Stating both figures is the only honest move:
+  // silently trusting one would put a number on screen that contradicts the Present
+  // tile a few centimetres above it.
+  const parity = mix.parity
+    ? ' On parade: ' +
+      fmtInt(mix.here) +
+      ' here, ' +
+      fmtInt(mix.presentLine) +
+      ' on the strength line.'
+    : '';
 
   return chartCard({
     title: 'How many soldiers are here today?',
-    note: 'Att B / LD counts as present.',
-    render: (node) => donutChart(node, { slices, centreLabel: 'accountable' }),
+    note: 'Grey is on parade, colour is not.' + parity,
+    height: 'chart--tall',
+    render: (node) =>
+      donutChart(node, {
+        slices: mix.slices.map((slice, index) => ({
+          name: slice.label,
+          value: slice.count,
+          color: colors[index],
+        })),
+        centreLabel: 'accountable',
+      }),
     table: {
-      columns: [{ label: 'Group' }, { label: 'Soldiers', numeric: true }, { label: 'Share', numeric: true }],
-      rows: slices.map((slice) => [
-        slice.name,
-        fmtInt(slice.value),
-        now.accountable > 0 ? fmtDecimal((slice.value / now.accountable) * 100, '%') : '—',
-      ]),
+      columns: [
+        { label: 'Category' },
+        { label: 'Soldiers', numeric: true },
+        { label: 'Share', numeric: true },
+      ],
+      rows: [
+        ...mix.slices.map((slice) => [slice.label, fmtInt(slice.count), share(slice.count)]),
+        ['On parade', fmtInt(mix.here), share(mix.here)],
+        ['Not on parade', fmtInt(mix.away), share(mix.away)],
+      ],
     },
   });
 }
 
 /**
- * The reasons the absentees are absent.
+ * The two ways the strength donut can be drawn against data it cannot represent.
+ *
+ * Both are upstream problems rather than display ones, so they are named in words above
+ * the chart instead of being smoothed into it.
  * @param {!Object} view The snapshot.
- * @returns {!HTMLElement} The card.
+ * @returns {?HTMLElement} A banner, or null when the breakdown is sound.
  */
-function reasonsCard_(view) {
-  const now = employability(view.strength, view.personnel, view.date, view.session);
-  const rows = now.reasons.slice().sort((a, b) => b.count - a.count);
-
-  return chartCard({
-    title: 'Why they are absent',
-    render: (node) =>
-      barChart(node, {
-        categories: rows.map((row) => row.label),
-        values: rows.map((row) => row.count),
-      }),
-    table: {
-      columns: [{ label: 'Reason' }, { label: 'Soldiers', numeric: true }],
-      rows: rows.map((row) => [row.label, fmtInt(row.count)]),
-    },
-  });
+function mixWarning_(view) {
+  const mix = strengthMix(view.strength, view.personnel, view.date, view.session);
+  if (mix.overflow > 0) {
+    return banner(
+      'warning',
+      'Check',
+      fmtInt(mix.overflow) + ' more soldiers filed than the strength lines account for.'
+    );
+  }
+  if (mix.unknown > 0) {
+    return banner(
+      'warning',
+      'Check',
+      fmtInt(mix.unknown) + ' filed under a category this dashboard does not know.'
+    );
+  }
+  return null;
 }
 
 /**
@@ -311,7 +366,8 @@ export function renderToday(view) {
             '.'
         ),
     sectionHead('The split'),
-    el('div', 'grid-2', [employabilityCard_(view), reasonsCard_(view)]),
+    strengthMixCard_(view),
+    mixWarning_(view),
     sectionHead('By company'),
     presenceCard_(view),
     absenceMixCard_(view),
