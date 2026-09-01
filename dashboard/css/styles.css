@@ -297,6 +297,195 @@ a {
   width: 100%;
 }
 
+/*
+ * Date range: a trigger that opens a month grid, plus quick-range buttons. Sits in the
+ * same row as the two selects but is given more room, because its label is a span of
+ * dates rather than a single word.
+ */
+.control--range {
+  flex: 1 1 15rem;
+  max-width: 22rem;
+  position: relative;
+}
+
+.daterange__trigger {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.5rem;
+  min-height: 2.25rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.daterange__trigger:hover {
+  border-color: var(--series-1);
+}
+
+.daterange__popover {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 30;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  padding: 0.6rem;
+  max-width: 92vw;
+}
+
+.calendar {
+  display: grid;
+  gap: 0.5rem;
+  width: 16rem;
+  max-width: 100%;
+}
+
+.calendar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.calendar__month {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.calendar__nav {
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  cursor: pointer;
+}
+
+.calendar__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar__weekday {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: 0.15rem;
+}
+
+.calendar__day {
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: var(--surface-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+}
+
+.calendar__day:hover:not(:disabled) {
+  border-color: var(--series-1);
+}
+
+.calendar__day:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.calendar__day--blank {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.calendar__day--in-range {
+  background: var(--seq-1);
+  color: var(--text-primary);
+}
+
+.calendar__day--start,
+.calendar__day--end {
+  background: var(--series-1);
+  color: #ffffff;
+  border-color: var(--series-1);
+}
+
+.calendar__hint {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.calendar__clear {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+}
+
+.calendar__clear:hover {
+  border-color: var(--series-1);
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.preset {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--surface-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.45rem;
+  cursor: pointer;
+}
+
+.preset:hover {
+  border-color: var(--series-1);
+}
+
+.preset--active {
+  color: #ffffff;
+  background: var(--series-1);
+  border-color: var(--series-1);
+}
+
 /* -------------------------------------------------------------------- view */
 
 .view {

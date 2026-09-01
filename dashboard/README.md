@@ -141,10 +141,12 @@ js/
     episodes.js     daily snapshots -> episodes
     metrics.js      strength, composition, rates, trends, leaderboards
     formsg.js       FormSG submissions
+    daterange.js    date-range predicates + quick-range presets
   views/
     today.js        the parade snapshot
     category.js     MC / report sick / status, one renderer for all three
     soldier.js      individual lookup
+  calendar.js       two-click month-grid date-range picker
   charts.js         ECharts theme; ui.js  DOM building blocks
 ```
 
@@ -189,6 +191,9 @@ duration came from, and flags the disagreement — it does not quietly pick a wi
   for, which is a poor trade for a ranking two plain columns already give you.
 - **No session filter.** Every parade state in the sheet is a first parade, so a control
   offering one option is furniture.
-- **No date window.** Trends cover everything ingested. A window control invited the
-  reader to wonder which slice a figure covered, and the parade-date filter already
-  answers "as at when".
+- **Date range, scoped to the aggregates only.** The range control (a two-click month
+  grid, plus Last 7 days / Last 14 days / This month / All) bounds every trend, rate and
+  leaderboard so they all cover one named span; it defaults to All. The Today view and
+  the masthead describe a single parade and ignore the range, and the parade-date
+  selector's options narrow to the dates inside it — so a "today" figure never sits
+  under a span the reader has to remember.

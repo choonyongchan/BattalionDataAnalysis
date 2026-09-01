@@ -42,16 +42,27 @@
     </nav>
 
     <!--
-      Two filters, because the data supports two. Session is gone: every parade state in
-      the sheet is a first parade, so a control offering one option is furniture. Window
-      is gone too — the dashboard reads everything ingested, and a window control invited
-      the reader to wonder which slice a figure covered.
+      Session is gone: every parade state in the sheet is a first parade, so a control
+      offering one option is furniture. The date range bounds every aggregated figure
+      (trends, rates, leaderboards) and defaults to "All" — the Today view and the
+      masthead describe a single parade and ignore it, so a reader is never left
+      wondering which slice a "today" figure covers.
     -->
     <form class="controls" id="controls" hidden>
       <label class="control">
         <span class="control__label">Parade date</span>
         <select class="control__input" id="control-date"></select>
       </label>
+      <div class="control control--range">
+        <span class="control__label">Date range</span>
+        <div id="control-daterange"></div>
+        <div class="presets" id="control-presets">
+          <button type="button" class="preset" data-preset="last7">Last 7 days</button>
+          <button type="button" class="preset" data-preset="last14">Last 14 days</button>
+          <button type="button" class="preset" data-preset="month">This month</button>
+          <button type="button" class="preset" data-preset="all">All</button>
+        </div>
+      </div>
       <label class="control">
         <span class="control__label">Company</span>
         <select class="control__input" id="control-company"></select>

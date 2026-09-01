@@ -20,8 +20,16 @@ import { buildEpisodes } from './model/episodes.js';
 import { toSubmissions } from './model/formsg.js';
 import { datesPresent, sessionsOn } from './model/metrics.js';
 import { toIsoDate, toText } from './model/normalize.js';
+import {
+  isoToday,
+  matchPreset,
+  overlapsRange,
+  resolvePreset,
+  withinRange,
+} from './model/daterange.js';
 import { COMPANIES } from './model/schema.js';
 import { disposeAll, resizeAll } from './charts.js';
+import { dateRangePicker } from './calendar.js';
 import { banner, el, fmtDate, replace } from './ui.js';
 import { renderToday } from './views/today.js';
 import { renderCategory } from './views/category.js';
@@ -109,7 +117,11 @@ const state = {
   submissions: [],
   dates: [],
   session: 'FPS',
-  filters: { date: null, company: 'ALL' },
+  // `date` names the single parade the "today" figures describe. `dateFrom`/`dateTo`
+  // bound every aggregated figure (trends, rates, leaderboards); both null means the
+  // long-standing default of reading everything ingested, and the Today view and
+  // masthead ignore the pair entirely.
+  filters: { date: null, company: 'ALL', dateFrom: null, dateTo: null },
 };
 
 /**
@@ -161,15 +173,23 @@ function load() {
  * @returns {void}
  */
 function fillControls() {
+  const { dateFrom, dateTo } = state.filters;
   const dateSelect = byId('control-date');
+  // Narrowed to the parades inside the range, so a "today" figure and the range agree
+  // on which dates exist — unless the range contains no parade at all, in which case
+  // the full list is kept rather than leaving the reader with an empty selector.
+  const inRange = state.dates.filter((date) => withinRange(date, dateFrom, dateTo));
+  const options = inRange.length > 0 ? inRange : state.dates;
   replace(
     dateSelect,
-    state.dates
+    options
       .slice()
       .reverse()
       .map((date) => el('option', { value: date }, fmtDate(date)))
   );
   dateSelect.value = state.filters.date || '';
+
+  fillRangeControls_();
 
   const companySelect = byId('control-company');
   const present = COMPANIES.filter((company) =>
@@ -180,6 +200,68 @@ function fillControls() {
     ...present.map((company) => el('option', { value: company }, company)),
   ]);
   companySelect.value = state.filters.company;
+}
+
+/**
+ * Mounts the date-range picker and lights up the matching quick-range button.
+ *
+ * The picker is rebuilt rather than mutated in place: it holds only transient UI state,
+ * and the committed range always comes from `state.filters`, so a fresh instance seeded
+ * from those two values is never out of step with what the views are showing.
+ * @returns {void}
+ */
+function fillRangeControls_() {
+  if (state.dates.length === 0) {
+    return;
+  }
+  const { dateFrom, dateTo } = state.filters;
+  replace(byId('control-daterange'), [
+    dateRangePicker({
+      min: state.dates[0],
+      max: state.dates[state.dates.length - 1],
+      from: dateFrom,
+      to: dateTo,
+      onChange: ({ from, to }) => setRange_(from, to),
+    }),
+  ]);
+
+  const active = matchPreset(dateFrom, dateTo, isoToday());
+  Array.from(byId('control-presets').querySelectorAll('.preset')).forEach((button) => {
+    button.classList.toggle('preset--active', button.dataset.preset === active);
+  });
+}
+
+/**
+ * Applies a new aggregated-view date range and redraws.
+ * @param {?string} from Inclusive lower bound, or null for "All".
+ * @param {?string} to Inclusive upper bound, or null for "All".
+ * @returns {void}
+ */
+function setRange_(from, to) {
+  state.filters.dateFrom = from;
+  state.filters.dateTo = to;
+  clampSelectedDate_();
+  fillControls();
+  render();
+}
+
+/**
+ * Keeps the selected parade date inside the active range.
+ *
+ * The Today view reads a single parade, so a range that no longer contains the current
+ * selection would leave that view pointed at a date the reader can no longer pick.
+ * Snapping to the latest in-range parade keeps the two controls consistent.
+ * @returns {void}
+ */
+function clampSelectedDate_() {
+  const { date, dateFrom, dateTo } = state.filters;
+  if (withinRange(date, dateFrom, dateTo)) {
+    return;
+  }
+  const inRange = state.dates.filter((day) => withinRange(day, dateFrom, dateTo));
+  state.filters.date =
+    inRange[inRange.length - 1] || state.dates[state.dates.length - 1] || null;
+  state.session = sessionOf_(state.data.strength, state.filters.date);
 }
 
 /**
@@ -195,32 +277,46 @@ function sessionOf_(strengthRows, isoDate) {
 /**
  * Builds the snapshot a view renders from.
  *
- * Every trend covers everything ingested. There is no window to choose, so `date` selects
- * which parade the "today" figures describe and nothing else — a reader can never be
- * looking at a rate whose span they have to remember.
+ * `date` selects which parade the "today" figures describe. When `applyRange` is set,
+ * the aggregated slices are also bounded by `dateFrom`/`dateTo` so every trend, rate and
+ * leaderboard covers the same named span; the Today view passes `false` so its
+ * single-parade figures and their deltas are never clipped by the range.
+ * @param {boolean} applyRange Whether to bound the slices by the active date range.
  * @returns {!Object} The current slice of the data.
  */
-function snapshot() {
-  const { date, company } = state.filters;
+function snapshot(applyRange) {
+  const { date, company, dateFrom, dateTo } = state.filters;
+  const ranged = applyRange && Boolean(dateFrom || dateTo);
   const inCompany = (row) => company === 'ALL' || toText(row.company) === company;
+  const inSlice = (row) =>
+    inCompany(row) && (!ranged || withinRange(toIsoDate(row.date), dateFrom, dateTo));
+  const inCompanyEpisode = (episode) => company === 'ALL' || episode.company === company;
+  const rangedDates = ranged
+    ? state.dates.filter((day) => withinRange(day, dateFrom, dateTo))
+    : state.dates;
 
   return {
     date,
     session: state.session,
     company,
-    dates: state.dates,
-    firstDate: state.dates[0] || null,
-    lastDate: state.dates[state.dates.length - 1] || null,
+    dates: rangedDates,
+    firstDate: rangedDates[0] || null,
+    lastDate: rangedDates[rangedDates.length - 1] || null,
     previousDate: previousDate_(date),
-    strength: state.data.strength.filter(inCompany),
-    personnel: state.data.personnel.filter(inCompany),
-    roster: state.data.roster.filter(inCompany),
+    strength: state.data.strength.filter(inSlice),
+    personnel: state.data.personnel.filter(inSlice),
+    roster: state.data.roster.filter(inSlice),
     episodes: state.episodes.filter(
-      (episode) => company === 'ALL' || episode.company === company
+      (episode) =>
+        inCompanyEpisode(episode) &&
+        (!ranged || overlapsRange(episode.startDate, episode.endDate, dateFrom, dateTo))
     ),
     submissions: state.submissions.filter(
       (submission) =>
-        company === 'ALL' || submission.company === company || submission.company === ''
+        (company === 'ALL' ||
+          submission.company === company ||
+          submission.company === '') &&
+        (!ranged || withinRange(submission.date, dateFrom, dateTo))
     ),
     formSgAvailable: state.data.formSgAvailable,
     formSgNote: state.data.formSgNote,
@@ -287,7 +383,9 @@ function render() {
     }
   });
 
-  const view = snapshot();
+  // The Today view and masthead describe a single parade, so they always see the full
+  // company slice; only the aggregated views are bounded by the date range.
+  const view = snapshot(route !== 'today');
   renderMasthead(view);
 
   const host = byId('view');
@@ -342,6 +440,13 @@ function wire() {
   byId('control-company').addEventListener('change', (event) =>
     setFilter('company', event.target.value)
   );
+
+  Array.from(byId('control-presets').querySelectorAll('.preset')).forEach((button) => {
+    button.addEventListener('click', () => {
+      const { from, to } = resolvePreset(button.dataset.preset, isoToday());
+      setRange_(from, to);
+    });
+  });
 
   window.addEventListener('hashchange', render);
   window.addEventListener('resize', debounce_(resizeAll, 150));

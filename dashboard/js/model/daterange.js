@@ -1,0 +1,169 @@
+/**
+ * Date-range filtering for the dashboard's aggregated views.
+ *
+ * The shell holds a `dateFrom`/`dateTo` pair; `null` on either end means "open", and
+ * `null` on both means "no restriction" — the dashboard's long-standing default of
+ * reading everything ingested. These helpers stay DOM-free and string-only so they can
+ * be unit-tested and reused by `snapshot()` without pulling in the view layer.
+ */
+
+import { addDays } from './normalize.js';
+
+/**
+ * Today's date in the viewer's own timezone, as ISO 'yyyy-MM-dd'.
+ *
+ * Local rather than UTC because the presets answer a human question — "the last seven
+ * days" means the last seven days where the reader is standing, not in Greenwich.
+ * @returns {string} ISO 'yyyy-MM-dd'.
+ */
+export function isoToday() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return now.getFullYear() + '-' + month + '-' + day;
+}
+
+/**
+ * Tests whether an ISO date falls within a range, inclusive of both ends.
+ *
+ * A `null` bound is treated as open, so `withinRange(d, null, null)` is always true —
+ * that is the "All" case, and callers can skip the predicate entirely when they see
+ * two nulls.
+ * @param {?string} isoDate ISO 'yyyy-MM-dd', or null.
+ * @param {?string} from Inclusive lower bound, or null for open.
+ * @param {?string} to Inclusive upper bound, or null for open.
+ * @returns {boolean} Whether the date is inside the range.
+ */
+export function withinRange(isoDate, from, to) {
+  if (!isoDate) {
+    return false;
+  }
+  if (from && isoDate < from) {
+    return false;
+  }
+  if (to && isoDate > to) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Tests whether a [startIso, endIso] span overlaps a range at all.
+ *
+ * Used for episodes, which have a duration: an MC that began before the window but
+ * runs into it is part of the window's picture, so the test is overlap, not
+ * containment. Either range bound may be null (open).
+ * @param {?string} startIso Span start, ISO 'yyyy-MM-dd'.
+ * @param {?string} endIso Span end, ISO 'yyyy-MM-dd'.
+ * @param {?string} from Range lower bound, or null for open.
+ * @param {?string} to Range upper bound, or null for open.
+ * @returns {boolean} Whether the span touches the range.
+ */
+export function overlapsRange(startIso, endIso, from, to) {
+  const start = startIso || endIso;
+  const end = endIso || startIso;
+  if (!start || !end) {
+    return false;
+  }
+  if (to && start > to) {
+    return false;
+  }
+  if (from && end < from) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Resolves a named quick-range preset to a concrete `{ from, to }` pair.
+ *
+ * `today` is passed in rather than read here so the caller controls the clock and the
+ * result is testable. "This month" runs from the first of `today`'s month; "All"
+ * clears both bounds.
+ * @param {string} name One of 'last7', 'last14', 'month', 'all'.
+ * @param {string} today ISO 'yyyy-MM-dd' to measure back from.
+ * @returns {{from: ?string, to: ?string}} The resolved range.
+ */
+export function resolvePreset(name, today) {
+  switch (name) {
+    case 'last7':
+      return { from: addDays(today, -6), to: today };
+    case 'last14':
+      return { from: addDays(today, -13), to: today };
+    case 'month':
+      return { from: today.slice(0, 7) + '-01', to: today };
+    case 'all':
+      return { from: null, to: null };
+    default:
+      return { from: null, to: null };
+  }
+}
+
+/**
+ * The first day of a month, as ISO 'yyyy-MM-01'.
+ * @param {string} isoDate Any ISO 'yyyy-MM-dd'.
+ * @returns {string} ISO 'yyyy-MM-01'.
+ */
+export function firstOfMonth(isoDate) {
+  return isoDate.slice(0, 7) + '-01';
+}
+
+/**
+ * Shifts a first-of-month ISO date by a whole number of months.
+ * @param {string} isoFirst ISO 'yyyy-MM-01'.
+ * @param {number} delta Months to add; may be negative.
+ * @returns {string} The resulting ISO 'yyyy-MM-01'.
+ */
+export function addMonths(isoFirst, delta) {
+  const [year, month] = isoFirst.split('-').map(Number);
+  const zeroBased = year * 12 + (month - 1) + delta;
+  const shiftedYear = Math.floor(zeroBased / 12);
+  const shiftedMonth = zeroBased - shiftedYear * 12;
+  return shiftedYear + '-' + String(shiftedMonth + 1).padStart(2, '0') + '-01';
+}
+
+/**
+ * The ISO dates of every day in a month, in order.
+ * @param {string} isoFirst ISO 'yyyy-MM-01'.
+ * @returns {Array<string>} ISO 'yyyy-MM-dd' for each day of that month.
+ */
+export function daysOfMonth(isoFirst) {
+  const [year, month] = isoFirst.split('-').map(Number);
+  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const days = [];
+  for (let day = 1; day <= count; day += 1) {
+    days.push(isoFirst.slice(0, 8) + String(day).padStart(2, '0'));
+  }
+  return days;
+}
+
+/**
+ * The Monday-first weekday index of an ISO date, 0 (Mon) to 6 (Sun).
+ * @param {string} isoDate ISO 'yyyy-MM-dd'.
+ * @returns {number} The weekday index, Monday as 0.
+ */
+export function mondayFirstIndex(isoDate) {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const sundayFirst = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return (sundayFirst + 6) % 7;
+}
+
+/**
+ * Names the preset a `{ from, to }` pair corresponds to, measured from `today`.
+ *
+ * Lets the control light up the button a range came from, and show none once a hand
+ * picked span no longer matches any preset.
+ * @param {?string} from Range lower bound, or null.
+ * @param {?string} to Range upper bound, or null.
+ * @param {string} today ISO 'yyyy-MM-dd' the presets are measured from.
+ * @returns {?string} The preset name, or null when the pair matches none.
+ */
+export function matchPreset(from, to, today) {
+  for (const name of ['all', 'last7', 'last14', 'month']) {
+    const preset = resolvePreset(name, today);
+    if (preset.from === from && preset.to === to) {
+      return name;
+    }
+  }
+  return null;
+}
