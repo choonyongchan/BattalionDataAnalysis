@@ -264,6 +264,49 @@ export function barChart(node, spec) {
 }
 
 /**
+ * A bar chart of two or more measures across the same categories, bars grouped per category.
+ *
+ * The series take the categorical colour slots in fixed order, so a measure keeps its
+ * colour when a filter drops one of the categories. One value axis, a legend because
+ * there is always more than one measure, and the crosshair tooltip carries every bar's
+ * value — as with every chart, the same numbers are in the card's table twin.
+ * @param {!HTMLElement} node Container element.
+ * @param {!Object} spec Chart contents: `categories`, `series` [{name, values}], `valueName`, `horizontal`.
+ * @returns {!Object} The chart instance.
+ */
+export function groupedBarChart(node, spec) {
+  const horizontal = spec.horizontal !== false;
+  const categoryAxis = axis_({ type: 'category', data: spec.categories, splitLine: { show: false } });
+  const valueAxis = valueAxis_(spec.valueName, !horizontal);
+
+  return mount_(node, {
+    ...base_(),
+    grid: { ...gridFor_(horizontal && Boolean(spec.valueName)), top: 36 },
+    legend: {
+      top: 0,
+      right: 0,
+      itemWidth: 10,
+      itemHeight: 10,
+      icon: 'roundRect',
+      textStyle: { color: COLOR.secondary, fontSize: 11 },
+    },
+    tooltip: { ...base_().tooltip, trigger: 'axis', axisPointer: { type: 'shadow' } },
+    xAxis: horizontal ? valueAxis : categoryAxis,
+    yAxis: horizontal ? { ...categoryAxis, inverse: true } : valueAxis,
+    series: spec.series.map((series, index) => ({
+      type: 'bar',
+      name: series.name,
+      data: series.values,
+      barMaxWidth: 14,
+      itemStyle: {
+        color: COLOR.series[index % COLOR.series.length],
+        borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
+      },
+    })),
+  });
+}
+
+/**
  * A multi-series line chart over dates.
  *
  * Series take the categorical slots in fixed order, so a series keeps its colour when a

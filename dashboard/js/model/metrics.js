@@ -747,6 +747,79 @@ export function leaderboard(episodes, dutyClass) {
 }
 
 /**
+ * Groups episodes by a key, counting episodes and distinct soldiers per group.
+ *
+ * Groups whose key is blank are dropped: an episode naming no company or no platoon has
+ * no bar to stand on. It is still counted toward the battalion total by the caller.
+ * @param {Array<!Object>} episodes Episodes to group.
+ * @param {function(!Object): string} keyOf Reads the grouping key from an episode.
+ * @returns {Array<{key: string, episodes: number, soldiers: number}>} One entry per key.
+ */
+function countGroups_(episodes, keyOf) {
+  const groups = new Map();
+  episodes.forEach((episode) => {
+    const key = keyOf(episode);
+    if (key === '') {
+      return;
+    }
+    const group = groups.get(key) || { key, episodes: 0, soldiers: new Set() };
+    group.episodes += 1;
+    group.soldiers.add(episode.key);
+    groups.set(key, group);
+  });
+  return Array.from(groups.values()).map((group) => ({
+    key: group.key,
+    episodes: group.episodes,
+    soldiers: group.soldiers.size,
+  }));
+}
+
+/**
+ * The volume of one duty class split two ways: how many episodes, how many soldiers.
+ *
+ * The episode count answers "how many times did this unit go into this state"; the
+ * soldier count answers "how many different people was that". The distance between the
+ * two is the repeat load — six soldiers filing thirty MCs is a different problem from
+ * thirty soldiers filing one each.
+ *
+ * This is a raw volume, not a size-fair rate: a bigger unit sits higher on both counts
+ * for being bigger. `companyRates` / `unitRates` are the comparison; this sits beside
+ * them. The battalion and per-platoon soldier counts are taken from the episode list
+ * whole, never summed from `byCompany`: a soldier who files under two companies across
+ * the range is one soldier to the battalion but a member of two company groups.
+ * @param {Array<!Object>} episodes Episodes to count, any duty class.
+ * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @returns {{byCompany: Array<{key: string, episodes: number, soldiers: number}>,
+ *   byPlatoon: Array<{key: string, episodes: number, soldiers: number}>,
+ *   total: {episodes: number, soldiers: number, perSoldier: ?number}}} Company groups
+ *   most-episodes first, platoon groups in roll order, and the battalion total with
+ *   episodes per soldier (null when no soldier was counted).
+ */
+export function episodeCounts(episodes, dutyClass) {
+  const scoped = episodes.filter((episode) => episode.dutyClass === dutyClass);
+
+  const byCompany = countGroups_(scoped, (episode) => toText(episode.company)).sort(
+    (a, b) => b.episodes - a.episodes || a.key.localeCompare(b.key)
+  );
+
+  const byPlatoonKey = new Map(
+    countGroups_(scoped, (episode) => toText(episode.platoon)).map((group) => [group.key, group])
+  );
+  const byPlatoon = PLATOONS.map((key) => byPlatoonKey.get(key)).filter(Boolean);
+
+  const soldiers = new Set(scoped.map((episode) => episode.key)).size;
+  return {
+    byCompany,
+    byPlatoon,
+    total: {
+      episodes: scoped.length,
+      soldiers,
+      perSoldier: soldiers > 0 ? scoped.length / soldiers : null,
+    },
+  };
+}
+
+/**
  * The most common reasons given for one duty class on one date.
  *
  * Answers "what are they reporting sick with today", which a bare count cannot. Reads

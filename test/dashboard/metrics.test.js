@@ -14,6 +14,7 @@ import {
   companyRates,
   dutyCountsOn,
   employability,
+  episodeCounts,
   leaderboard,
   longMcRoster,
   longMcTrend,
@@ -229,6 +230,95 @@ describe('leaderboard', () => {
       DUTY_CLASS.ATT_C
     );
     expect(ranked[0].lastStart).toBe('2026-07-20');
+  });
+});
+
+describe('episode counts split volume from headcount', () => {
+  /**
+   * Builds episodes from terse per-row specs.
+   * @param {Array<!Object>} specs Partial personnel rows.
+   * @returns {Array<!Object>} The episodes those rows imply.
+   */
+  function episodesOf(specs) {
+    return buildEpisodes(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL));
+  }
+
+  test('a soldier with two separate spells is two episodes but one soldier', () => {
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-15', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-15', end_date: '2026-06-15', reason: 'MC' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.byCompany).toEqual([{ key: 'Braves', episodes: 2, soldiers: 1 }]);
+    expect(counts.total).toEqual({ episodes: 2, soldiers: 1, perSoldier: 2 });
+  });
+
+  test('two soldiers in one company are two episodes and two soldiers', () => {
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '2', four_d: 'B', name: 'B', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.byCompany.find((row) => row.key === 'Braves')).toEqual({
+      key: 'Braves',
+      episodes: 2,
+      soldiers: 2,
+    });
+    expect(counts.total.perSoldier).toBe(1);
+  });
+
+  test('company groups lead with the most episodes; platoon groups follow the roll', () => {
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Archer', platoon: 'HQ', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '4', four_d: 'B', name: 'B', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '2', four_d: 'C', name: 'C', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.byCompany.map((row) => row.key)).toEqual(['Braves', 'Archer']);
+    expect(counts.byPlatoon.map((row) => row.key)).toEqual(['2', '4', 'HQ']);
+  });
+
+  test('the battalion soldier count is counted whole, not summed from the company groups', () => {
+    // One soldier files once under each of two companies across the range.
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Archer', platoon: '1', four_d: 'MOVER', name: 'Mover', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-20', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'MOVER', name: 'Mover', reason_category: 'Att C', start_date: '2026-06-20', end_date: '2026-06-20', reason: 'MC' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.byCompany.reduce((sum, row) => sum + row.soldiers, 0)).toBe(2);
+    expect(counts.total.soldiers).toBe(1);
+    expect(counts.total.episodes).toBe(2);
+  });
+
+  test('an episode naming no platoon still counts for the battalion but has no platoon bar', () => {
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '', four_d: 'B', name: 'B', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.total.episodes).toBe(2);
+    expect(counts.byPlatoon).toEqual([{ key: '1', episodes: 1, soldiers: 1 }]);
+  });
+
+  test('only the requested duty class is counted', () => {
+    const counts = episodeCounts(
+      episodesOf([
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'MC' },
+        { date: '2026-06-01', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'B', name: 'B', reason_category: 'Status', start_date: '2026-06-01', end_date: '2026-06-01', reason: 'LD' },
+      ]),
+      DUTY_CLASS.ATT_C
+    );
+    expect(counts.total).toEqual({ episodes: 1, soldiers: 1, perSoldier: 1 });
   });
 });
 

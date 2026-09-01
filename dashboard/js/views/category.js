@@ -26,6 +26,7 @@ import {
   companyRates,
   dataQuality,
   durationDistribution,
+  episodeCounts,
   leaderboard,
   longMcRoster,
   longMcTrend,
@@ -35,7 +36,7 @@ import {
   weekdayDistribution,
   OUTLIER_Z,
 } from '../model/metrics.js';
-import { barChart, donutChart, heatmap, lineChart } from '../charts.js';
+import { barChart, donutChart, groupedBarChart, heatmap, lineChart } from '../charts.js';
 import {
   banner,
   chartCard,
@@ -584,6 +585,65 @@ function wordPanels_(view, spec) {
 }
 
 /**
+ * The plain volume behind the rates: how many times, and how many soldiers.
+ *
+ * The company and platoon cards above put every unit on a rate, so a large company is
+ * not flagged for being large. These two put the count back on the page — episodes as
+ * one bar, the soldiers behind them as the other. The gap between the pair is the
+ * repeat load, and the battalion line names it as a figure.
+ * @param {!Object} view The snapshot.
+ * @param {!Object} spec The category.
+ * @returns {Array<!HTMLElement>} The by-company card and the by-platoon card.
+ */
+function countsCard_(view, spec) {
+  const counts = episodeCounts(episodesOf_(view, spec), spec.dutyClass);
+  const note =
+    'Battalion: ' +
+    fmtInt(counts.total.episodes) +
+    ' episodes across ' +
+    fmtInt(counts.total.soldiers) +
+    (counts.total.soldiers === 1 ? ' soldier' : ' soldiers') +
+    (counts.total.perSoldier === null
+      ? ''
+      : ' — ' + fmtDecimal(counts.total.perSoldier) + ' per soldier') +
+    '. A count of volume, not a size-fair rate; the cards above are the comparison.';
+
+  const card = (title, unit, rows) =>
+    chartCard({
+      title,
+      note,
+      render: (node) =>
+        groupedBarChart(node, {
+          categories: rows.map((row) => row.key),
+          series: [
+            { name: 'times', values: rows.map((row) => row.episodes) },
+            { name: 'soldiers', values: rows.map((row) => row.soldiers) },
+          ],
+          valueName: 'count',
+        }),
+      table: {
+        columns: [
+          { label: unit },
+          { label: 'Times', numeric: true },
+          { label: 'Soldiers', numeric: true },
+          { label: 'Per soldier', numeric: true },
+        ],
+        rows: rows.map((row) => [
+          row.key,
+          fmtInt(row.episodes),
+          fmtInt(row.soldiers),
+          row.soldiers > 0 ? fmtDecimal(row.episodes / row.soldiers) : '—',
+        ]),
+      },
+    });
+
+  return [
+    card(spec.title + ' — times vs soldiers by company', 'Company', counts.byCompany),
+    card(spec.title + ' — times vs soldiers by platoon', 'Platoon', counts.byPlatoon),
+  ];
+}
+
+/**
  * Renders one category view.
  * @param {!Object} view The snapshot.
  * @param {!Object} spec The category, from CATEGORIES in app.js.
@@ -612,6 +672,7 @@ export function renderCategory(view, spec) {
     sectionHead('Where is it?'),
     companyCard_(view, spec),
     platoonCard_(view, spec),
+    ...countsCard_(view, spec),
     ...(spec.showPatterns ? patternPanels_(view, spec) : []),
     ...(spec.showReasons ? typePanel_(view) : []),
     ...(spec.showReasons ? wordPanels_(view, spec) : []),
