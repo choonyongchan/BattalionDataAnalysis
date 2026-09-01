@@ -373,6 +373,33 @@ describe('unit rates make companies comparable', () => {
     expect(hercules.per100).toBeGreaterThan(braves.per100);
   });
 
+  test('people is a headcount while days is the load', () => {
+    const strengthRows = toRecords(
+      strengthValues([
+        { date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: '1', unit_type: 'PLATOON', total_strength: 50 },
+        { date: '2026-06-23', session: 'FPS', company: 'Braves', platoon: '1', unit_type: 'PLATOON', total_strength: 50 },
+      ]),
+      STRENGTH_HEADERS,
+      TABS.STRENGTH
+    );
+    const personnelRows = toRecords(
+      personnelValues([
+        // One soldier out on both parades: two person-days, one person.
+        { date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', reason: 'MC' },
+        { date: '2026-06-23', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'A', name: 'A', reason_category: 'Att C', reason: 'MC' },
+        // A second soldier out once.
+        { date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: '1', four_d: 'B', name: 'B', reason_category: 'Att C', reason: 'MC' },
+      ]),
+      PERSONNEL_HEADERS,
+      TABS.PERSONNEL
+    );
+    const platoon = unitRates(personnelRows, strengthRows, DUTY_CLASS.ATT_C).filter(
+      (row) => row.platoon === '1'
+    )[0];
+    expect(platoon.days).toBe(3);
+    expect(platoon.people).toBe(2);
+  });
+
   test('an outlier is flagged by z-score, not by raw count', () => {
     const strengthRows = toRecords(
       strengthValues(

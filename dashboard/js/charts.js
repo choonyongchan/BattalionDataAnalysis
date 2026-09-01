@@ -383,11 +383,10 @@ function linesToNode_(lines) {
 }
 
 /**
- * A company by platoon heatmap of a rate.
+ * A company by platoon heatmap of a count.
  *
- * Sequential single-hue ramp: this encodes magnitude, so a rainbow would invent
- * categories that are not there. Cells that breach the outlier threshold are ringed
- * rather than recoloured, so the flag never competes with the value the colour carries.
+ * Sequential single-hue ramp, dark for the larger count: this encodes magnitude, so a
+ * rainbow would invent categories that are not there.
  * @param {!HTMLElement} node Container element.
  * @param {!Object} spec Chart contents.
  * @returns {!Object} The chart instance.
@@ -418,10 +417,13 @@ export function heatmap(node, spec) {
       // numbers on it tells the reader that a cell is darker, not by how much.
       itemWidth: 14,
       itemHeight: 160,
-      text: [max.toFixed(1) + '%', '0%'],
+      text: [String(max), '0'],
       textGap: 8,
       textStyle: { color: COLOR.muted, fontSize: 11, fontFamily: '"IBM Plex Mono", ui-monospace, monospace' },
-      inRange: { color: COLOR.sequential },
+      // Reversed so the darkest step is the largest count. The stylesheet ramp runs
+      // dark -> light for a surface where the low end should recede; here the reader is
+      // counting heads and "more" should read as "heavier".
+      inRange: { color: [...COLOR.sequential].reverse() },
     },
     series: [
       {
@@ -430,18 +432,6 @@ export function heatmap(node, spec) {
         // A 2px surface gap between cells, rather than a border drawn around each.
         itemStyle: { borderColor: COLOR.surface, borderWidth: 2, borderRadius: 2 },
         emphasis: { itemStyle: { borderColor: COLOR.text, borderWidth: 2 } },
-        // Flagged cells are annotated rather than recoloured, so the flag never competes
-        // with the value the cell's colour is carrying.
-        markPoint: spec.flagged && spec.flagged.length > 0
-          ? {
-              symbol: 'circle',
-              symbolSize: 12,
-              silent: true,
-              itemStyle: { color: COLOR.critical, borderColor: COLOR.surface, borderWidth: 2 },
-              label: { show: false },
-              data: spec.flagged,
-            }
-          : undefined,
       },
     ],
   });

@@ -208,6 +208,10 @@ function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
     });
 
   const personDays = new Map();
+  // Distinct soldiers per unit, deduped on identity alone: the same soldier out on
+  // ten parades is ten person-days but one person. This is the headcount the platoon
+  // grid colours by, where `days` is the load a rate divides.
+  const persons = new Map();
   personnelRows
     .filter((row) => classify(row) === dutyClass)
     .forEach((row) => {
@@ -217,12 +221,16 @@ function rateRows_(personnelRows, strengthRows, dutyClass, keyOf) {
       const bucket = personDays.get(key) || new Set();
       bucket.add(identity.key + '@' + date);
       personDays.set(key, bucket);
+      const heads = persons.get(key) || new Set();
+      heads.add(identity.key);
+      persons.set(key, heads);
     });
 
   const keys = new Set([...paxDays.keys(), ...personDays.keys()]);
   const rows = Array.from(keys).map((key) => ({
     key,
     days: (personDays.get(key) || new Set()).size,
+    people: (persons.get(key) || new Set()).size,
     paxDays: paxDays.get(key) || 0,
   }));
 
