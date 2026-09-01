@@ -20,7 +20,7 @@
  */
 
 import { DUTY_CLASS, keywords } from '../model/classify.js';
-import { keywordCounts } from '../model/formsg.js';
+import { keywordCounts, reportSickTypeCounts } from '../model/formsg.js';
 import {
   categoryTrend,
   companyRates,
@@ -35,7 +35,7 @@ import {
   weekdayDistribution,
   OUTLIER_Z,
 } from '../model/metrics.js';
-import { barChart, heatmap, lineChart } from '../charts.js';
+import { barChart, donutChart, heatmap, lineChart } from '../charts.js';
 import {
   banner,
   chartCard,
@@ -516,6 +516,49 @@ function patternPanels_(view, spec) {
 }
 
 /**
+ * How the report-sick submissions split by type — RSI, RSO, FFI, Medical Review.
+ *
+ * Drawn from FormSG only: the "Report Sick Type" question is a FormSG field, and
+ * `view.submissions` is already bounded by the active date range, so the donut tracks
+ * the date control with no extra wiring.
+ * @param {!Object} view The snapshot.
+ * @returns {Array<Node>} The panel, or [] when nothing has been submitted.
+ */
+function typePanel_(view) {
+  const counts = reportSickTypeCounts(view.submissions);
+  const total = counts.reduce((sum, entry) => sum + entry.count, 0);
+  if (total === 0) {
+    return [];
+  }
+
+  return [
+    sectionHead('How they reported sick'),
+    chartCard({
+      title: 'By type',
+      note: fmtInt(total) + ' FormSG submissions in range.',
+      height: 'chart--tall',
+      render: (node) =>
+        donutChart(node, {
+          slices: counts.map((entry) => ({ name: entry.type, value: entry.count })),
+          centreLabel: 'submissions',
+        }),
+      table: {
+        columns: [
+          { label: 'Type' },
+          { label: 'Submissions', numeric: true },
+          { label: 'Share', numeric: true },
+        ],
+        rows: counts.map((entry) => [
+          entry.type,
+          fmtInt(entry.count),
+          fmtShare(entry.count / total),
+        ]),
+      },
+    }),
+  ];
+}
+
+/**
  * The soldiers' own words.
  * @param {!Object} view The snapshot.
  * @param {!Object} spec The category.
@@ -570,6 +613,7 @@ export function renderCategory(view, spec) {
     companyCard_(view, spec),
     platoonCard_(view, spec),
     ...(spec.showPatterns ? patternPanels_(view, spec) : []),
+    ...(spec.showReasons ? typePanel_(view) : []),
     ...(spec.showReasons ? wordPanels_(view, spec) : []),
     sectionHead('Who, most often?'),
     leaderboardCard_(view, spec),

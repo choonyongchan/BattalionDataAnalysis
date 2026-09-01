@@ -48,6 +48,7 @@ export function toSubmissions(rows) {
         key: fourD !== '' ? '4D:' + fourD : name !== '' ? 'NAME:' + normaliseName(name) : '',
         company: companyFrom_(row['Unit & Coy']),
         unitText: toText(row['Unit & Coy']),
+        reportSickType: toText(row['Report Sick Type']),
         text,
         symptoms: extractSymptoms(text),
         keywords: keywords(text),
@@ -75,4 +76,36 @@ export function keywordCounts(keywordLists, limit) {
     .map(([word, count]) => ({ word, count }))
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
     .slice(0, limit || 40);
+}
+
+/**
+ * Counts submissions by their "Report Sick Type" answer.
+ *
+ * The parts are mutually exclusive and sum to every submission, so this feeds a donut.
+ * A blank answer is a real outcome — some rows predate the form question — and is kept as
+ * `Unspecified` rather than dropped. The donut reads best with at most four slices, so
+ * any types past `limit` are folded into a single `Other`; the total is preserved.
+ * @param {Array<!Object>} submissions Normalised submissions from `toSubmissions`.
+ * @param {number=} limit Most slices to return; defaults to 4.
+ * @returns {Array<{type: string, count: number}>} Types, most frequent first.
+ */
+export function reportSickTypeCounts(submissions, limit) {
+  const cap = limit || 4;
+  const counts = new Map();
+  submissions.forEach((submission) => {
+    const type = toText(submission.reportSickType) || 'Unspecified';
+    counts.set(type, (counts.get(type) || 0) + 1);
+  });
+  const ranked = Array.from(counts.entries())
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
+  if (ranked.length <= cap) {
+    return ranked;
+  }
+  const head = ranked.slice(0, cap - 1);
+  const tail = ranked.slice(cap - 1);
+  return head.concat({
+    type: 'Other',
+    count: tail.reduce((sum, entry) => sum + entry.count, 0),
+  });
 }
