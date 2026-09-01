@@ -21,7 +21,7 @@ import {
 describe('MC is Att C, matched by category', () => {
   test('an Att C row is MC whatever its reason says', () => {
     ['MC', 'MC (Fever, cough)', 'HL', 'FEVER', 'FOOD POISONING', ''].forEach((reason) => {
-      expect(classify({ reason_category: 'Att C', reason })).toBe(DUTY_CLASS.MC);
+      expect(classify({ reason_category: 'Att C', reason })).toBe(DUTY_CLASS.ATT_C);
     });
   });
 
@@ -49,7 +49,7 @@ describe('status is present, not absent', () => {
   });
 
   test('MC, MA, Off/Leave and Others count as absence', () => {
-    [DUTY_CLASS.MC, DUTY_CLASS.MA, DUTY_CLASS.OFF_LEAVE, DUTY_CLASS.OTHERS].forEach((cls) => {
+    [DUTY_CLASS.ATT_C, DUTY_CLASS.MA, DUTY_CLASS.OFF_LEAVE, DUTY_CLASS.OTHERS].forEach((cls) => {
       expect(isAbsent(cls)).toBe(true);
     });
   });

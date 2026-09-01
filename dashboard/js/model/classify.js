@@ -27,7 +27,7 @@ import { toText } from './normalize.js';
  * @type {!Object<string, string>}
  */
 export const DUTY_CLASS = {
-  MC: 'MC',
+  ATT_C: 'Att C',
   REPORT_SICK: 'Report Sick',
   STATUS: 'Status',
   MA: 'MA',
@@ -45,7 +45,7 @@ export const DUTY_CLASS = {
  * @type {!Object<string, string>}
  */
 const CATEGORY_TO_CLASS = {
-  'Att C': DUTY_CLASS.MC,
+  'Att C': DUTY_CLASS.ATT_C,
   'Report Sick': DUTY_CLASS.REPORT_SICK,
   Status: DUTY_CLASS.STATUS,
   MA: DUTY_CLASS.MA,
@@ -65,7 +65,7 @@ const CATEGORY_TO_CLASS = {
  * @type {!Object<string, string>}
  */
 export const EMPLOYABILITY = {
-  [DUTY_CLASS.MC]: 'ABSENT',
+  [DUTY_CLASS.ATT_C]: 'ABSENT',
   [DUTY_CLASS.REPORT_SICK]: 'EVENT',
   [DUTY_CLASS.STATUS]: 'RESTRICTED',
   [DUTY_CLASS.MA]: 'ABSENT',

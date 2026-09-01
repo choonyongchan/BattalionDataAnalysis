@@ -25,7 +25,7 @@ let query = '';
  * @returns {!Object} Their profile.
  */
 function profileOf_(episodes) {
-  const mc = episodes.filter((episode) => episode.dutyClass === DUTY_CLASS.MC);
+  const mc = episodes.filter((episode) => episode.dutyClass === DUTY_CLASS.ATT_C);
   const sick = episodes.filter((episode) => episode.dutyClass === DUTY_CLASS.REPORT_SICK);
   const latest = episodes[episodes.length - 1] || {};
   const mcDays = mc.reduce((total, episode) => total + episode.daysLost, 0);
@@ -179,7 +179,7 @@ function profileCard_(profile) {
  */
 function repeatCard_(view) {
   const combined = new Map();
-  [DUTY_CLASS.MC, DUTY_CLASS.REPORT_SICK, DUTY_CLASS.STATUS].forEach((dutyClass) => {
+  [DUTY_CLASS.ATT_C, DUTY_CLASS.REPORT_SICK, DUTY_CLASS.STATUS].forEach((dutyClass) => {
     leaderboard(view.episodes, dutyClass).forEach((entry) => {
       const merged = combined.get(entry.key) || {
         ...entry,
@@ -189,7 +189,7 @@ function repeatCard_(view) {
         total: 0,
         days: 0,
       };
-      if (dutyClass === DUTY_CLASS.MC) merged.mc = entry.episodes;
+      if (dutyClass === DUTY_CLASS.ATT_C) merged.mc = entry.episodes;
       if (dutyClass === DUTY_CLASS.REPORT_SICK) merged.sick = entry.episodes;
       if (dutyClass === DUTY_CLASS.STATUS) merged.status = entry.episodes;
       merged.total += entry.episodes;
@@ -221,7 +221,7 @@ function repeatCard_(view) {
         { label: '4D' },
         { label: 'Coy' },
         { label: 'Plt' },
-        { label: 'MC', numeric: true },
+        { label: 'Att C', numeric: true },
         { label: 'Sick', numeric: true },
         { label: 'Status', numeric: true },
         { label: 'Days', numeric: true },

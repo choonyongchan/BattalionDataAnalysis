@@ -51,7 +51,7 @@ describe('a repeated absence is one episode', () => {
   test('four daily rows sharing a start date collapse to one', () => {
     const episodes = episodesFrom(fourDayMc());
     expect(episodes).toHaveLength(1);
-    expect(episodes[0].dutyClass).toBe(DUTY_CLASS.MC);
+    expect(episodes[0].dutyClass).toBe(DUTY_CLASS.ATT_C);
     expect(episodes[0].observedDays).toBe(4);
     expect(episodes[0].rowCount).toBe(4);
   });
@@ -84,7 +84,7 @@ describe('a repeated absence is one episode', () => {
     });
     const episodes = episodesFrom([...fourDayMc(), ...status]);
     expect(episodes.map((episode) => episode.dutyClass).sort()).toEqual([
-      DUTY_CLASS.MC,
+      DUTY_CLASS.ATT_C,
       DUTY_CLASS.STATUS,
     ]);
   });

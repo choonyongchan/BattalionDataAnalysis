@@ -52,10 +52,10 @@ const VIEWS = {
 const CATEGORIES = {
   mc: {
     key: 'mc',
-    dutyClass: DUTY_CLASS.MC,
-    title: 'MC',
-    full: 'MC (Att C)',
-    noun: 'MC',
+    dutyClass: DUTY_CLASS.ATT_C,
+    title: 'Att C',
+    full: 'Att C',
+    noun: 'Att C',
     // The repeat table counts episodes and sums the days they cost. Both columns are
     // named after the category rather than after the model, because "3 episodes, 11
     // days" means nothing to a commander until it reads "3 Att C, 11 days away".

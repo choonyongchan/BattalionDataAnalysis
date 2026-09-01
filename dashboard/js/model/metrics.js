@@ -305,7 +305,7 @@ function zScore_(days, paxDays, rate) {
  * @type {Array<{label: string, dutyClass: string}>}
  */
 export const ABSENCE_REASONS = [
-  { label: 'MC (Att C)', dutyClass: DUTY_CLASS.MC },
+  { label: 'Att C', dutyClass: DUTY_CLASS.ATT_C },
   { label: 'Duty / course', dutyClass: DUTY_CLASS.OTHERS },
   { label: 'Medical appt', dutyClass: DUTY_CLASS.MA },
   { label: 'Off / leave', dutyClass: DUTY_CLASS.OFF_LEAVE },
@@ -387,7 +387,7 @@ export const PARADE_MIX = [
   { label: 'Full duty', dutyClass: null, here: true },
   { label: 'Duty / course', dutyClass: DUTY_CLASS.OTHERS, here: true },
   { label: 'Att B / LD', dutyClass: DUTY_CLASS.STATUS, here: true },
-  { label: 'Att C', dutyClass: DUTY_CLASS.MC, here: false },
+  { label: 'Att C', dutyClass: DUTY_CLASS.ATT_C, here: false },
   { label: 'Report sick', dutyClass: DUTY_CLASS.REPORT_SICK, here: false },
   { label: 'MA', dutyClass: DUTY_CLASS.MA, here: false },
   { label: 'Off / leave', dutyClass: DUTY_CLASS.OFF_LEAVE, here: false },
@@ -407,7 +407,7 @@ export const PARADE_MIX = [
  * @type {string[]}
  */
 const MIX_PRECEDENCE = [
-  DUTY_CLASS.MC,
+  DUTY_CLASS.ATT_C,
   DUTY_CLASS.OFF_LEAVE,
   DUTY_CLASS.MA,
   DUTY_CLASS.REPORT_SICK,

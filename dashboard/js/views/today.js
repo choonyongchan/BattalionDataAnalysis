@@ -68,7 +68,7 @@ function tiles_(view) {
       'down'
     );
 
-  const mcDelta = countDelta(DUTY_CLASS.MC);
+  const mcDelta = countDelta(DUTY_CLASS.ATT_C);
   const sickDelta = countDelta(DUTY_CLASS.REPORT_SICK);
   const statusDelta = countDelta(DUTY_CLASS.STATUS);
 
@@ -86,8 +86,8 @@ function tiles_(view) {
       deltaClass: presentDelta.className,
     }),
     tile({
-      label: 'On MC · Att C',
-      value: fmtInt(duty.counts[DUTY_CLASS.MC]),
+      label: 'On Att C',
+      value: fmtInt(duty.counts[DUTY_CLASS.ATT_C]),
       fraction: 'excused all duties',
       delta: mcDelta.text,
       deltaClass: mcDelta.className,

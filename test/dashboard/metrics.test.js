@@ -52,7 +52,7 @@ describe('duty counts are of soldiers, not rows', () => {
       PERSONNEL_HEADERS,
       TABS.PERSONNEL
     );
-    expect(dutyCountsOn(rows, '2026-06-22').counts[DUTY_CLASS.MC]).toBe(2);
+    expect(dutyCountsOn(rows, '2026-06-22').counts[DUTY_CLASS.ATT_C]).toBe(2);
   });
 
   test('rows naming no soldier are reported, not dropped', () => {
@@ -63,7 +63,7 @@ describe('duty counts are of soldiers, not rows', () => {
     );
     const result = dutyCountsOn(rows, '2026-06-22');
     expect(result.unattributable).toBe(1);
-    expect(result.counts[DUTY_CLASS.MC]).toBe(0);
+    expect(result.counts[DUTY_CLASS.ATT_C]).toBe(0);
   });
 });
 
@@ -97,7 +97,7 @@ describe('employability', () => {
     const classes = ABSENCE_REASONS.map((reason) => reason.dutyClass);
     expect(classes).not.toContain(DUTY_CLASS.REPORT_SICK);
     expect(classes).not.toContain(DUTY_CLASS.STATUS);
-    expect(classes).toContain(DUTY_CLASS.MC);
+    expect(classes).toContain(DUTY_CLASS.ATT_C);
   });
 });
 
@@ -126,7 +126,7 @@ describe('company rates', () => {
       TABS.PERSONNEL
     );
 
-    const rates = companyRates(personnelRows, strengthRows, DUTY_CLASS.MC);
+    const rates = companyRates(personnelRows, strengthRows, DUTY_CLASS.ATT_C);
     const braves = rates.filter((row) => row.company === 'Braves')[0];
     const hercules = rates.filter((row) => row.company === 'Hercules')[0];
 
@@ -171,7 +171,7 @@ describe('leaderboard', () => {
       ...episodesFor('LONG', [['2026-06-01', '2026-06-30']]),
     ];
 
-    const ranked = leaderboard(episodes, DUTY_CLASS.MC);
+    const ranked = leaderboard(episodes, DUTY_CLASS.ATT_C);
     expect(ranked[0].fourD).toBe('FREQ');
     expect(ranked[0].episodes).toBe(3);
     // The long single absence loses on episodes despite far more days lost, which is the
@@ -191,15 +191,15 @@ describe('leaderboard', () => {
         TABS.PERSONNEL
       )
     );
-    expect(leaderboard(episodes, DUTY_CLASS.MC)).toHaveLength(1);
-    expect(leaderboard(episodes, DUTY_CLASS.MC)[0].episodes).toBe(1);
+    expect(leaderboard(episodes, DUTY_CLASS.ATT_C)).toHaveLength(1);
+    expect(leaderboard(episodes, DUTY_CLASS.ATT_C)[0].episodes).toBe(1);
     expect(leaderboard(episodes, DUTY_CLASS.STATUS)).toHaveLength(1);
   });
 
   test('carries the latest episode date so a stale entry is visible', () => {
     const ranked = leaderboard(
       episodesFor('A', [['2026-06-01', '2026-06-01'], ['2026-07-20', '2026-07-20']]),
-      DUTY_CLASS.MC
+      DUTY_CLASS.ATT_C
     );
     expect(ranked[0].lastStart).toBe('2026-07-20');
   });
@@ -246,7 +246,7 @@ describe('unit rates make companies comparable', () => {
       PERSONNEL_HEADERS,
       TABS.PERSONNEL
     );
-    const rates = unitRates(personnelRows, strengthRows, DUTY_CLASS.MC);
+    const rates = unitRates(personnelRows, strengthRows, DUTY_CLASS.ATT_C);
     const braves = rates.filter((row) => row.company === 'Braves')[0];
     const hercules = rates.filter((row) => row.company === 'Hercules')[0];
     expect(braves.days).toBe(4);
@@ -271,7 +271,7 @@ describe('unit rates make companies comparable', () => {
     for (let i = 0; i < 25; i += 1) {
       specs.push({ date: '2026-06-22', session: 'FPS', company: 'Braves', platoon: '4', four_d: 'X' + i, name: 'X' + i, reason_category: 'Att C', reason: 'MC' });
     }
-    const rates = unitRates(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL), strengthRows, DUTY_CLASS.MC);
+    const rates = unitRates(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL), strengthRows, DUTY_CLASS.ATT_C);
     const flagged = rates.filter((row) => row.isOutlier).map((row) => row.platoon);
     expect(flagged).toEqual(['4']);
   });
@@ -293,7 +293,7 @@ describe('unit rates make companies comparable', () => {
         specs.push({ date: '2026-06-22', session: 'FPS', company: 'Braves', platoon, four_d: platoon + '-' + i, name: platoon + '-' + i, reason_category: 'Att C', reason: 'MC' });
       }
     });
-    const rates = unitRates(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL), strengthRows, DUTY_CLASS.MC);
+    const rates = unitRates(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL), strengthRows, DUTY_CLASS.ATT_C);
     const quiet = rates.filter((row) => row.platoon === '4')[0];
     expect(quiet.days).toBe(0);
     expect(quiet.z).toBeLessThan(-2);
@@ -434,7 +434,7 @@ describe('a platoon rate is drawn over the platoon roll only', () => {
       PERSONNEL_HEADERS,
       TABS.PERSONNEL
     );
-    const rates = unitRates(personnelRows, strengthRows(), DUTY_CLASS.MC);
+    const rates = unitRates(personnelRows, strengthRows(), DUTY_CLASS.ATT_C);
     expect(rates.map((row) => row.platoon)).toEqual(['1', '2', '3', '4', 'HQ']);
     expect(rates.reduce((sum, row) => sum + row.days, 0)).toBe(1);
   });
@@ -447,7 +447,7 @@ describe('a platoon rate is drawn over the platoon roll only', () => {
       PERSONNEL_HEADERS,
       TABS.PERSONNEL
     );
-    const rates = unitRates(personnelRows, strengthRows(), DUTY_CLASS.MC);
+    const rates = unitRates(personnelRows, strengthRows(), DUTY_CLASS.ATT_C);
     // 250 pax-days across the five platoons, not 275 with the command element folded in.
     expect(rates.reduce((sum, row) => sum + row.paxDays, 0)).toBe(250);
     expect(rates.filter((row) => row.platoon === '1')[0].per100).toBe(2);
