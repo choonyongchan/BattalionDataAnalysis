@@ -39,6 +39,24 @@ function sum_(values) {
 }
 
 /**
+ * The middle value of a list of numbers.
+ *
+ * Preferred over the mean wherever a single extreme unit or episode would drag the
+ * summary away from the typical case — the median moves with the bulk of the data, not
+ * with its tail.
+ * @param {Array<?number>} values Values to summarise; nulls are dropped, input not mutated.
+ * @returns {?number} The median, or null when nothing remains to summarise.
+ */
+export function median(values) {
+  const sorted = values.filter((value) => value !== null && value !== undefined).sort((a, b) => a - b);
+  if (sorted.length === 0) {
+    return null;
+  }
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+/**
  * Lists the distinct parade dates present in a set of rows, most recent last.
  * @param {Array<!Object>} rows Rows carrying a `date` field.
  * @returns {string[]} Sorted ISO dates.

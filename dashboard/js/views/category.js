@@ -27,6 +27,7 @@ import {
   dataQuality,
   durationDistribution,
   leaderboard,
+  median,
   symptomCounts,
   unitRates,
   weekdayDistribution,
@@ -151,9 +152,7 @@ function headcountCard_(view, spec) {
  */
 function companyCard_(view, spec) {
   const rates = companyRates(view.personnel, view.strength, spec.dutyClass);
-  const totalDays = rates.reduce((sum, row) => sum + row.days, 0);
-  const totalPaxDays = rates.reduce((sum, row) => sum + row.paxDays, 0);
-  const mean = totalPaxDays > 0 ? (totalDays / totalPaxDays) * 100 : null;
+  const midRate = median(rates.map((row) => row.per100));
 
   const flagged = rates.filter((row) => row.isOutlier);
 
@@ -173,7 +172,8 @@ function companyCard_(view, spec) {
         values: rates.map((row) => Number((row.per100 || 0).toFixed(2))),
         valueName: '%',
         highlight: (index) => rates[index].isOutlier,
-        meanLine: mean === null ? null : Number(mean.toFixed(2)),
+        meanLine: midRate === null ? null : Number(midRate.toFixed(2)),
+        meanLineLabel: 'company median',
       }),
     table: {
       columns: [
@@ -436,7 +436,8 @@ function patternPanels_(view, spec) {
             categories: weekdays.map((day) => day.name),
             values: weekdays.map((day) => day.count),
             valueName: 'episodes',
-            meanLine: weekdayTotal > 0 ? Number((weekdayTotal / 7).toFixed(2)) : null,
+            meanLine: median(weekdays.map((day) => day.count)),
+            meanLineLabel: 'median',
           }),
         table: {
           columns: [{ label: 'Day' }, { label: 'Episodes', numeric: true }, { label: 'Share', numeric: true }],

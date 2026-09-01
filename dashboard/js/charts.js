@@ -248,7 +248,7 @@ export function barChart(node, spec) {
               // line, and on a horizontal bar chart that line is vertical — the caption
               // came out running up the page on its side.
               label: {
-                formatter: spec.meanLineLabel || 'battalion mean',
+                formatter: spec.meanLineLabel || 'median',
                 position: horizontal ? 'insideEndTop' : 'insideStartTop',
                 rotate: 0,
                 color: COLOR.muted,

@@ -15,6 +15,7 @@ import {
   dutyCountsOn,
   employability,
   leaderboard,
+  median,
   PARADE_MIX,
   strengthMix,
   topReasonsOn,
@@ -25,6 +26,29 @@ import { buildEpisodes } from '../../dashboard/js/model/episodes.js';
 import { toRecords } from '../../dashboard/js/model/normalize.js';
 import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../dashboard/js/model/schema.js';
 import { personnelValues, strengthValues } from './fixtures.js';
+
+describe('median', () => {
+  test('is the middle value for an odd count', () => {
+    expect(median([7, 1, 3])).toBe(3);
+  });
+
+  test('averages the two middle values for an even count', () => {
+    expect(median([1, 2, 3, 8])).toBe(2.5);
+  });
+
+  test('drops nulls before summarising, so a missing value is not read as zero', () => {
+    expect(median([null, 4, null, 6])).toBe(5);
+  });
+
+  test('is null when nothing remains to summarise', () => {
+    expect(median([])).toBeNull();
+    expect(median([null, null])).toBeNull();
+  });
+
+  test('follows the bulk of the data, not one long outlier', () => {
+    expect(median([1, 1, 2, 2, 100])).toBe(2);
+  });
+});
 
 describe('battalion strength', () => {
   test('platoon rows are excluded, so nothing is double-counted', () => {

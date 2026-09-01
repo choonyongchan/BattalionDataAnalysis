@@ -12,7 +12,7 @@
  */
 
 import { DUTY_CLASS } from '../model/classify.js';
-import { leaderboard } from '../model/metrics.js';
+import { leaderboard, median } from '../model/metrics.js';
 import { normaliseName, toText } from '../model/normalize.js';
 import { banner, el, fmtDate, fmtDecimal, fmtInt, sectionHead, table } from '../ui.js';
 
@@ -37,7 +37,7 @@ function profileOf_(episodes) {
     platoon: latest.platoon || '',
     mcEpisodes: mc.length,
     mcDays,
-    averageMc: mc.length > 0 ? mcDays / mc.length : null,
+    medianMc: median(mc.map((episode) => episode.daysLost)),
     sickEpisodes: sick.length,
     episodes,
   };
@@ -146,8 +146,8 @@ function profileCard_(profile) {
         el('span', 'tile__value', fmtInt(profile.mcDays)),
       ]),
       el('div', 'tile', [
-        el('span', 'tile__label', 'Average episode'),
-        el('span', 'tile__value', fmtDecimal(profile.averageMc, 'd')),
+        el('span', 'tile__label', 'Median episode'),
+        el('span', 'tile__value', fmtDecimal(profile.medianMc, 'd')),
       ]),
       el('div', 'tile', [
         el('span', 'tile__label', 'Times reported sick'),

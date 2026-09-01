@@ -25,6 +25,7 @@ import {
   companyBreakdown,
   dutyCountsOn,
   employability,
+  median,
   strengthMix,
   topReasonsOn,
 } from '../model/metrics.js';
@@ -218,8 +219,7 @@ function mixWarning_(view) {
  */
 function presenceCard_(view) {
   const companies = companyBreakdown(view.strength, view.personnel, view.date, view.session);
-  const now = employability(view.strength, view.personnel, view.date, view.session);
-  const mean = now.percentPresent;
+  const midPresent = median(companies.map((row) => row.percentPresent));
 
   return chartCard({
     title: 'Present rate by company',
@@ -229,7 +229,8 @@ function presenceCard_(view) {
         categories: companies.map((row) => row.company),
         values: companies.map((row) => Number((row.percentPresent || 0).toFixed(1))),
         valueName: '% present',
-        meanLine: mean === null ? null : Number(mean.toFixed(1)),
+        meanLine: midPresent === null ? null : Number(midPresent.toFixed(1)),
+        meanLineLabel: 'company median',
       }),
     table: {
       columns: [
