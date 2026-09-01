@@ -6,7 +6,7 @@
  *
  *   1. Is it getting worse?        — the trend, over everything ingested
  *   2. Which company?              — rates, so a big company is not flagged for being big
- *   3. Which platoon?              — the heatmap, with elevated units marked
+ *   3. Which platoon?              — the heatmap, a headcount per company and platoon
  *   4. Who, most often?            — the leaderboard
  *
  * One renderer serves all three so the three tabs cannot drift into three layouts. What
@@ -21,6 +21,7 @@
 
 import { DUTY_CLASS, keywords } from '../model/classify.js';
 import { keywordCounts, reportSickTypeCounts } from '../model/formsg.js';
+import { reconcileReportSick } from '../model/reconcile.js';
 import {
   categoryTrend,
   companyRates,
@@ -34,7 +35,6 @@ import {
   symptomCounts,
   unitRates,
   weekdayDistribution,
-  OUTLIER_Z,
 } from '../model/metrics.js';
 import { barChart, donutChart, groupedBarChart, heatmap, lineChart } from '../charts.js';
 import {
@@ -218,24 +218,13 @@ function companyCard_(view, spec) {
   const rates = companyRates(view.personnel, view.strength, spec.dutyClass);
   const midRate = median(rates.map((row) => row.per100));
 
-  const flagged = rates.filter((row) => row.isOutlier);
-
   return chartCard({
     title: spec.title + ' rate by company',
-    // The only note here names what red means. A status colour carrying a meaning on its
-    // own is unreadable in greyscale, and to a viewer who cannot separate it from the
-    // series blue it says nothing at all. Everything else the axis and the line already
-    // say.
-    note:
-      flagged.length > 0
-        ? 'Red: above ' + OUTLIER_Z + ' SD — ' + flagged.map((row) => row.company).join(', ') + '.'
-        : '',
     render: (node) =>
       barChart(node, {
         categories: rates.map((row) => row.company),
         values: rates.map((row) => Number((row.per100 || 0).toFixed(2))),
         valueName: '%',
-        highlight: (index) => rates[index].isOutlier,
         meanLine: midRate === null ? null : Number(midRate.toFixed(2)),
         meanLineLabel: 'company median',
       }),
@@ -259,7 +248,7 @@ function companyCard_(view, spec) {
 }
 
 /**
- * Rate by company and platoon, with elevated units marked.
+ * A company by platoon grid of how many people the category covers.
  * @param {!Object} view The snapshot.
  * @param {!Object} spec The category.
  * @returns {!HTMLElement} The card.
@@ -278,88 +267,52 @@ function platoonCard_(view, spec) {
 
   const byKey = new Map(rates.map((row) => [row.company + '|' + row.platoon, row]));
   const cells = [];
-  const flagged = [];
   companies.forEach((company, rowIndex) => {
     platoons.forEach((platoon, colIndex) => {
       const row = byKey.get(company + '|' + platoon);
       if (!row || row.paxDays === 0) {
         return;
       }
-      cells.push([colIndex, rowIndex, Number((row.per100 || 0).toFixed(2))]);
-      if (row.isOutlier) {
-        flagged.push({ coord: [colIndex, rowIndex] });
-      }
+      cells.push([colIndex, rowIndex, row.people || 0]);
     });
   });
 
-  const outliers = rates.filter((row) => row.isOutlier);
-
-  // The heatmap is only as good as its attribution. Rows naming no platoon are not on
+  // The grid is only as good as its attribution. Rows naming no platoon are not on
   // the grid at all — there is no honest column for them — so the share that named none
   // is the reader's only measure of how much of the battalion this picture covers.
   // Stated as one number, and only when it is bad enough to change how to read the grid.
   const quality = dataQuality(view.personnel);
   const thin = quality.platoon !== null && quality.platoon < 0.9;
 
-  return el('div', null, [
-    chartCard({
-      title: spec.title + ' rate by platoon',
-      note:
-        'Dot: above ' + OUTLIER_Z + ' SD.' +
-        (thin ? ' ' + fmtShare(1 - quality.platoon) + ' named no platoon, and are not here.' : ''),
-      height: 'chart--tall',
-      render: (node) =>
-        heatmap(node, {
-          rows: companies,
-          columns: platoons,
-          cells,
-          flagged,
-          // Returns lines, not markup: `charts.js` inserts each as text.
-          detail: (colIndex, rowIndex) => {
-            const row = byKey.get(companies[rowIndex] + '|' + platoons[colIndex]);
-            if (!row) {
-              return [];
-            }
-            return [
-              companies[rowIndex] + ' · Platoon ' + platoons[colIndex],
-              fmtDecimal(row.per100, '%') + ' of days observed',
-              fmtInt(row.days) + ' days out of ' + fmtInt(row.paxDays),
-              row.z === null ? 'too little data to score' : 'z = ' + row.z.toFixed(1),
-            ];
-          },
-        }),
-      table: {
-        columns: [
-          { label: 'Company' },
-          { label: 'Platoon' },
-          { label: 'Days', numeric: true },
-          { label: 'Days observed', numeric: true },
-          { label: '%', numeric: true },
-          { label: 'z', numeric: true },
-        ],
-        rows: rates
-          .slice()
-          .sort((a, b) => (b.per100 || 0) - (a.per100 || 0))
-          .map((row) => [
-            row.company,
-            row.platoon,
-            fmtInt(row.days),
-            fmtInt(row.paxDays),
-            fmtDecimal(row.per100),
-            row.z === null ? '—' : row.z.toFixed(1),
-          ]),
-      },
-    }),
-    outliers.length === 0
-      ? banner('info', 'Even', 'No platoon stands out.')
-      : banner(
-          'warning',
-          'Localised',
-          outliers
-            .map((row) => row.company + ' platoon ' + row.platoon + ' (' + fmtDecimal(row.per100, '%') + ')')
-            .join('; ') + '.'
-        ),
-  ]);
+  return chartCard({
+    title: spec.title + ' by platoon',
+    note: thin ? fmtShare(1 - quality.platoon) + ' named no platoon, and are not here.' : '',
+    height: 'chart--tall',
+    render: (node) =>
+      heatmap(node, {
+        rows: companies,
+        columns: platoons,
+        cells,
+        // Returns lines, not markup: `charts.js` inserts each as text.
+        detail: (colIndex, rowIndex) => {
+          const row = byKey.get(companies[rowIndex] + '|' + platoons[colIndex]);
+          if (!row) {
+            return [];
+          }
+          return [
+            companies[rowIndex] + ' · Platoon ' + platoons[colIndex],
+            fmtInt(row.people) + (row.people === 1 ? ' person' : ' people'),
+          ];
+        },
+      }),
+    table: {
+      columns: [{ label: 'Company' }, { label: 'Platoon' }, { label: 'People', numeric: true }],
+      rows: rates
+        .slice()
+        .sort((a, b) => (b.people || 0) - (a.people || 0))
+        .map((row) => [row.company, row.platoon, fmtInt(row.people)]),
+    },
+  });
 }
 
 /**
@@ -517,6 +470,67 @@ function patternPanels_(view, spec) {
 }
 
 /**
+ * Parade state against FormSG: who reported sick in each source, and who is missing.
+ *
+ * The parade state and the report-sick form are filled in by different people, so a
+ * commander wants the two side by side — the counts per company, and the names that
+ * turned up in one source but not the other. Names are tallied by 4D number where both
+ * sides carry it, then by a fuzzy name match; `view.episodes` and `view.submissions` are
+ * already bounded by the active company and date filters.
+ * @param {!Object} view The snapshot.
+ * @param {!Object} spec The category.
+ * @returns {Array<Node>} The panel, or [] when there is nothing to reconcile.
+ */
+function reconcilePanel_(view, spec) {
+  if (!view.formSgAvailable) {
+    return [];
+  }
+  const rows = reconcileReportSick(episodesOf_(view, spec), view.submissions);
+  if (rows.length === 0) {
+    return [];
+  }
+
+  return [
+    sectionHead('Parade state vs FormSG', fmtInt(rows.length) + (rows.length === 1 ? ' company' : ' companies')),
+    chartCard({
+      title: 'Reporting sick vs reported sick, by company',
+      note:
+        'Names tallied across sources by 4D number, then by fuzzy name match. ' +
+        'Bounded by the active company and date filters.',
+      height: 'chart--tall',
+      render: (node) =>
+        groupedBarChart(node, {
+          categories: rows.map((row) => row.company),
+          series: [
+            { name: 'Reporting sick (parade state)', values: rows.map((row) => row.paradeCount) },
+            { name: 'Reported sick (FormSG)', values: rows.map((row) => row.formsgCount) },
+          ],
+          valueName: 'Soldiers',
+          horizontal: false,
+        }),
+      table: {
+        columns: [
+          { label: 'Company' },
+          { label: 'Reporting sick (PS)', numeric: true },
+          { label: 'Reported sick (FormSG)', numeric: true },
+          { label: 'Matched', numeric: true },
+          { label: 'Only in parade state' },
+          { label: 'Only in FormSG' },
+        ],
+        rows: rows.map((row) => [
+          row.company,
+          fmtInt(row.paradeCount),
+          fmtInt(row.formsgCount),
+          fmtInt(row.matched),
+          row.paradeOnly.join(', ') || '—',
+          row.formsgOnly.join(', ') || '—',
+        ]),
+      },
+    }),
+  ];
+}
+
+/**
  * How the report-sick submissions split by type — RSI, RSO, FFI, Medical Review.
  *
  * Drawn from FormSG only: the "Report Sick Type" question is a FormSG field, and
@@ -661,6 +675,7 @@ export function renderCategory(view, spec) {
   }
 
   return [
+    ...(spec.showReasons ? reconcilePanel_(view, spec) : []),
     sectionHead(
       'Is it getting worse?',
       fmtInt(episodes.length) +
