@@ -131,6 +131,23 @@ describe('duration is reported, never derived', () => {
     expect(episode.daysLostSource).toBe('span');
   });
 
+  test('a permanent status (num_days 999) is a flag, not a 999-day episode', () => {
+    const episode = episodesFrom(
+      fourDayMc({
+        reason_category: 'Status',
+        reason: 'Permanent Excuse (Throwing Grenades)',
+        start_date: '',
+        end_date: '',
+        num_days: 999,
+      })
+    )[0];
+    expect(episode.permanent).toBe(true);
+    expect(episode.statedDays).toBeNull();
+    expect(episode.daysLost).toBe(4);
+    expect(episode.daysLostSource).toBe('observed');
+    expect(episode.disagreement).toBe(false);
+  });
+
   test('a one-day MC counts as one day, not zero', () => {
     const episode = episodesFrom([
       {

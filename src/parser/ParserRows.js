@@ -153,6 +153,23 @@ class ParserRows {
   }
 
   /**
+   * The `num_days` to write for a personnel entry.
+   *
+   * A permanent Status entry — `reason_category` "Status" whose `reason` names it
+   * permanent — is written with the PERM_STATUS_NUM_DAYS sentinel regardless of
+   * what it stated, so "no expiry" is one integer check downstream. This is a
+   * keyword-to-sentinel map, not a derivation from the date pair, so it does not
+   * cross the line this file's header draws.
+   * @param {!Object} person A validated personnel entry.
+   * @returns {*} The sentinel, or the entry's own `num_days`.
+   */
+  static personNumDays_(person) {
+    const isPermStatus =
+      person.reason_category === 'Status' && /\bperm/i.test(String(person.reason || ''));
+    return isPermStatus ? PERM_STATUS_NUM_DAYS : person.num_days;
+  }
+
+  /**
    * Shapes a validated extraction into Strength Data rows: one per platoons[]
    * entry, including the mandatory company-total row.
    * @param {!Object} extraction A validated extraction object.
@@ -214,7 +231,7 @@ class ParserRows {
       person.reason_category,
       ParserRows.cell_(person.start_date),
       ParserRows.cell_(person.end_date),
-      ParserRows.cell_(person.num_days),
+      ParserRows.cell_(ParserRows.personNumDays_(person)),
       person.reason,
       ParserRows.cell_(person.location),
       ParserRows.cell_(person.in_camp),

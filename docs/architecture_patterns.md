@@ -236,7 +236,11 @@ in the text, and `ParserRows` computes none. This is not fastidiousness: the lab
 examples contain entries whose stated day-count disagrees with their own date range, and
 overnight duties spanning two dates that count as one day, so a derived `num_days` would
 be wrong precisely where it fired. `in_camp` is likewise never inferred from a location
-name. See `ParserRows`' header for the full argument.
+name. The single sanctioned exception is a keyword-to-sentinel map: a permanent `Status`
+entry (its `reason` says "Permanent"/"Perm") is forced to `num_days` `999`
+(`PERM_STATUS_NUM_DAYS`) so downstream reads "no expiry" as one integer check. That is
+not date arithmetic, so it does not cross the line above. See `ParserRows`' header for
+the full argument.
 
 ## Testing
 

@@ -183,6 +183,70 @@ describe('a successful run', () => {
   });
 });
 
+describe('the permanent-status num_days sentinel', () => {
+  /**
+   * Reads the num_days cell of the first personnel data row.
+   *
+   * @param {!Object} env The environment.
+   * @returns {*} The cell value.
+   */
+  function personnelNumDays(env) {
+    const columns = env.globals.PERSONNEL_DATA_COLUMNS;
+    return env.sheetOf(env.globals.SHEET_NAMES.PERSONNEL_DATA).rows[1][columns.indexOf('num_days')];
+  }
+
+  /**
+   * Builds a one-entry personnel list, merging overrides onto a Status entry.
+   *
+   * @param {!Object} overrides Fields to merge over the Status entry.
+   * @returns {!Array<!Object>} The personnel list.
+   */
+  function onePerson(overrides) {
+    return [
+      {
+        name: 'LOW JIA HAO',
+        rank: 'REC',
+        four_d: '3110',
+        platoon: '3',
+        reason_category: 'Status',
+        start_date: null,
+        end_date: null,
+        num_days: null,
+        reason: 'Excuse (Throwing Grenades)',
+        location: null,
+        in_camp: null,
+        ...overrides,
+      },
+    ];
+  }
+
+  test('forces 999 for a Status entry whose reason names it permanent, even with no start date', () => {
+    const env = withRow();
+    env.stubExtraction(extraction({ personnel: onePerson({ reason: 'Permanent Excuse (Throwing Grenades)' }) }));
+    env.globals.Parser.processRow(2, '');
+
+    expect(personnelNumDays(env)).toBe(999);
+  });
+
+  test('leaves a Status entry with no "perm" in its reason untouched', () => {
+    const env = withRow();
+    env.stubExtraction(extraction({ personnel: onePerson({ reason: 'Excuse Heavy Loads', num_days: 21 }) }));
+    env.globals.Parser.processRow(2, '');
+
+    expect(personnelNumDays(env)).toBe(21);
+  });
+
+  test('does not touch a non-Status entry that happens to say "perm"', () => {
+    const env = withRow();
+    env.stubExtraction(
+      extraction({ personnel: onePerson({ reason_category: 'Others', reason: 'Permanent light duties admin', num_days: null }) })
+    );
+    env.globals.Parser.processRow(2, '');
+
+    expect(personnelNumDays(env)).toBe('');
+  });
+});
+
 describe('a failing run', () => {
   test('records an extraction failure on the row and writes no output', () => {
     const env = withRow();

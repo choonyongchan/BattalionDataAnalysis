@@ -111,6 +111,9 @@ const STRENGTH_DATA_COLUMNS = [
  * start_date/end_date are ISO 'yyyy-MM-dd' (or '' when not stated); num_days is
  * the day count the message itself states, or '' when it states none — it is
  * never computed from the date pair, for the reasons in `ParserRows`' header.
+ * The one exception is PERM_STATUS_NUM_DAYS: a permanent Status entry is written
+ * with that sentinel regardless of what it stated, so "no expiry" is a single
+ * integer check downstream rather than an inference from missing dates.
  * @type {string[]}
  */
 const PERSONNEL_DATA_COLUMNS = [
@@ -251,6 +254,17 @@ const PLAUSIBLE_YEARS = {
   MIN: 2020,
   MAX: 2100,
 };
+
+/**
+ * `num_days` sentinel for a permanent status: "no expiry", not a real day count.
+ *
+ * A permanent Status entry has no end date and often no meaningful start date, so
+ * `ParserRows` forces this value whenever an entry's `reason_category` is `Status`
+ * and its `reason` names it permanent. Downstream reads it as a flag, never as a
+ * duration.
+ * @type {number}
+ */
+const PERM_STATUS_NUM_DAYS = 999;
 
 /**
  * Sheet lookup and the identity rules every other parser file keys off of.

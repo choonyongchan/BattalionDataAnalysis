@@ -119,7 +119,11 @@ no count is stated — and that shape is the overnight duty
 (`DATE & TIME: 180626 1630 - 190626 0800`, 17 entries in `archer.txt`), which is
 one duty, not the two days an inclusive count gives. Two other entries state a
 count that disagrees with their own date range, and the stated figure is the one
-the unit tracks. Same reasoning bars inferring `in_camp` from a location name:
+the unit tracks. The lone exception is a keyword-to-sentinel map, not date
+arithmetic: a permanent `Status` entry is forced to `num_days` `999`
+(`PERM_STATUS_NUM_DAYS`) so "no expiry" is one integer check downstream instead of
+an inference from a missing `start_date`. Same reasoning bars inferring `in_camp`
+from a location name:
 an audit found 35 of 41 non-null `in_camp` labels had been inferred that way,
 including 31 in a message that never mentions a camp at all.
 
@@ -353,8 +357,12 @@ label the AI attributed the entry to, or `''` for a company/HQ-level entry not
 inside any specific platoon's block. `start_date`/`end_date`/`num_days` replace a
 single combined duration string, and each is `''` when the message doesn't state
 it — including the deliberately common cases of an open-ended status (start only),
-an open-started one (end only), and an entry with no dates at all. `in_camp` is
-`''` unless the message says so explicitly; it is never inferred from `location`.
+an open-started one (end only), and an entry with no dates at all. The one derived
+value is the `PERM_STATUS_NUM_DAYS` sentinel (`999`): `ParserRows` writes it for a
+permanent status — `reason_category` `Status` whose `reason` says "Permanent" or
+"Perm" — as a "no expiry" marker rather than a day count, and `start_date` may be
+`''`. `in_camp` is `''` unless the message says so explicitly; it is never
+inferred from `location`.
 
 **Command Roster** — `parade_response_id, date, session, company, role, rank, name`
 One row per command-team member in the message's header block (`CDO: 2LT RYAN`).

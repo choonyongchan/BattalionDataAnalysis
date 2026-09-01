@@ -18,7 +18,15 @@
  */
 
 import { classify, extractSymptoms } from './classify.js';
-import { inclusiveDaySpan, isoToUtcMs, normaliseName, toIsoDate, toNumber, toText } from './normalize.js';
+import {
+  PERM_STATUS_NUM_DAYS,
+  inclusiveDaySpan,
+  isoToUtcMs,
+  normaliseName,
+  toIsoDate,
+  toNumber,
+  toText,
+} from './normalize.js';
 
 /**
  * Identity key for a soldier.
@@ -122,7 +130,9 @@ function buildEpisode_(key, dutyClass, rows) {
   const startDate = toIsoDate(rows[0].start_date) || paradeDates[0] || null;
   const endDate = toIsoDate(latestValue_(rows, 'end_date')) || paradeDates[paradeDates.length - 1] || null;
 
-  const statedDays = toNumber(latestValue_(rows, 'num_days'));
+  const rawStatedDays = toNumber(latestValue_(rows, 'num_days'));
+  const permanent = rawStatedDays === PERM_STATUS_NUM_DAYS;
+  const statedDays = permanent ? null : rawStatedDays;
   const hasStatedDates = Boolean(toIsoDate(rows[0].start_date) && toIsoDate(latestValue_(rows, 'end_date')));
   const spanDays = hasStatedDates ? inclusiveDaySpan(startDate, endDate) : null;
   const observedDays = paradeDates.length;
@@ -145,6 +155,7 @@ function buildEpisode_(key, dutyClass, rows) {
     observedDays,
     statedDays,
     spanDays,
+    permanent,
     daysLost: duration.days,
     daysLostSource: duration.source,
     disagreement: statedDays !== null && spanDays !== null && statedDays !== spanDays,

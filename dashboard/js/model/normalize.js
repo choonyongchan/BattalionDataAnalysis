@@ -24,6 +24,16 @@
 const MS_PER_DAY = 86400000;
 
 /**
+ * `num_days` sentinel a permanent status carries: "no expiry", not a duration.
+ *
+ * The parser writes it for a permanent Status entry; the episode model reads it as
+ * a flag and never lets it reach a day-count. Mirrors `PERM_STATUS_NUM_DAYS` in
+ * `src/parser/ParserSchema.js`.
+ * @type {number}
+ */
+export const PERM_STATUS_NUM_DAYS = 999;
+
+/**
  * Epoch Sheets serial numbers count from: 1899-12-30 UTC, where serial 1 is 1899-12-31.
  * @type {number}
  */
