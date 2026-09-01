@@ -10,6 +10,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   addMonths,
   daysOfMonth,
+  eachDay,
   firstOfMonth,
   matchPreset,
   mondayFirstIndex,
@@ -67,6 +68,34 @@ describe('overlapsRange', () => {
   test('a one-day span (start equals end) is handled', () => {
     expect(overlapsRange('2026-06-15', '2026-06-15', '2026-06-01', '2026-06-30')).toBe(true);
     expect(overlapsRange('2026-07-15', '2026-07-15', '2026-06-01', '2026-06-30')).toBe(false);
+  });
+});
+
+describe('eachDay', () => {
+  test('lists every day inclusive of both ends', () => {
+    expect(eachDay('2026-06-01', '2026-06-04')).toEqual([
+      '2026-06-01',
+      '2026-06-02',
+      '2026-06-03',
+      '2026-06-04',
+    ]);
+  });
+
+  test('a single-day range is just that day', () => {
+    expect(eachDay('2026-06-15', '2026-06-15')).toEqual(['2026-06-15']);
+  });
+
+  test('returns nothing when the end precedes the start or a bound is missing', () => {
+    expect(eachDay('2026-06-15', '2026-06-14')).toEqual([]);
+    expect(eachDay(null, '2026-06-14')).toEqual([]);
+    expect(eachDay('2026-06-01', null)).toEqual([]);
+  });
+
+  test('crosses a month boundary with the right length and endpoints', () => {
+    const days = eachDay('2026-06-28', '2026-07-02');
+    expect(days).toHaveLength(5);
+    expect(days[0]).toBe('2026-06-28');
+    expect(days[4]).toBe('2026-07-02');
   });
 });
 

@@ -74,6 +74,7 @@ const CATEGORIES = {
     // lead on headcount.
     countsDays: true,
     showPatterns: true,
+    showLongMc: true,
   },
   reportsick: {
     key: 'reportsick',

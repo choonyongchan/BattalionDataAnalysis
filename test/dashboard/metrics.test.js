@@ -15,10 +15,13 @@ import {
   dutyCountsOn,
   employability,
   leaderboard,
+  longMcRoster,
+  longMcTrend,
   median,
   PARADE_MIX,
   strengthMix,
   topReasonsOn,
+  UNASSIGNED,
   unitRates,
 } from '../../dashboard/js/model/metrics.js';
 import { DUTY_CLASS } from '../../dashboard/js/model/classify.js';
@@ -475,5 +478,125 @@ describe('a platoon rate is drawn over the platoon roll only', () => {
     // 250 pax-days across the five platoons, not 275 with the command element folded in.
     expect(rates.reduce((sum, row) => sum + row.paxDays, 0)).toBe(250);
     expect(rates.filter((row) => row.platoon === '1')[0].per100).toBe(2);
+  });
+});
+
+/**
+ * Builds episodes from terse Personnel Data row specs.
+ * @param {Array<!Object>} specs Partial personnel rows.
+ * @returns {Array<!Object>} The resulting episodes.
+ */
+function episodesFrom(specs) {
+  return buildEpisodes(toRecords(personnelValues(specs), PERSONNEL_HEADERS, TABS.PERSONNEL));
+}
+
+/**
+ * One row standing for a whole episode: the start date carries the grouping, so a
+ * single parade row with stated start and end dates is one episode.
+ * @param {!Object} spec Fields to set on the row.
+ * @returns {!Object} A personnel row spec.
+ */
+function episodeRow(spec) {
+  return {
+    date: spec.start_date,
+    session: 'FPS',
+    company: 'Cougar',
+    platoon: '4',
+    reason_category: 'Att C',
+    reason: 'MC',
+    ...spec,
+  };
+}
+
+describe('longMcTrend', () => {
+  test('counts each soldier on every day their long MC covers', () => {
+    // Soldier A on Att C 1-14 Aug, Soldier B on Att C 5-30 Aug.
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'A1', name: 'ALPHA', start_date: '2026-08-01', end_date: '2026-08-14' }),
+      episodeRow({ four_d: 'B2', name: 'BRAVO', start_date: '2026-08-05', end_date: '2026-08-30' }),
+    ]);
+    const trend = longMcTrend(episodes, '2026-08-01', '2026-08-31', DUTY_CLASS.ATT_C);
+    const on = (date) => trend.find((point) => point.date === date).count;
+    expect(on('2026-08-02')).toBe(1); // only A
+    expect(on('2026-08-06')).toBe(2); // A and B
+    expect(on('2026-08-20')).toBe(1); // only B
+    expect(on('2026-08-31')).toBe(0); // neither
+    expect(trend).toHaveLength(31);
+  });
+
+  test('an MC of four days or fewer is never counted', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'S1', name: 'SHORT', start_date: '2026-08-01', end_date: '2026-08-04', num_days: 4 }),
+      episodeRow({ four_d: 'L1', name: 'LONG', start_date: '2026-08-01', end_date: '2026-08-05', num_days: 5 }),
+    ]);
+    const trend = longMcTrend(episodes, '2026-08-01', '2026-08-05', DUTY_CLASS.ATT_C);
+    expect(trend.every((point) => point.count <= 1)).toBe(true);
+    expect(trend.find((point) => point.date === '2026-08-03').count).toBe(1); // LONG only
+  });
+
+  test('with no stated day count the start-to-end span decides', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'X1', name: 'XRAY', start_date: '2026-08-01', end_date: '2026-08-10' }),
+    ]);
+    const trend = longMcTrend(episodes, '2026-08-01', '2026-08-10', DUTY_CLASS.ATT_C);
+    expect(trend.find((point) => point.date === '2026-08-07').count).toBe(1);
+  });
+
+  test('two overlapping long episodes for one soldier count once', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'D1', name: 'DELTA', start_date: '2026-08-01', end_date: '2026-08-10' }),
+      episodeRow({ four_d: 'D1', name: 'DELTA', start_date: '2026-08-05', end_date: '2026-08-20' }),
+    ]);
+    const trend = longMcTrend(episodes, '2026-08-01', '2026-08-20', DUTY_CLASS.ATT_C);
+    expect(trend.find((point) => point.date === '2026-08-07').count).toBe(1);
+  });
+
+  test('a long episode of another duty class does not appear', () => {
+    const episodes = episodesFrom([
+      episodeRow({
+        four_d: 'P1',
+        name: 'PERM',
+        reason_category: 'Status',
+        reason: 'Status',
+        start_date: '2026-08-01',
+        end_date: '2026-08-30',
+      }),
+    ]);
+    const trend = longMcTrend(episodes, '2026-08-01', '2026-08-30', DUTY_CLASS.ATT_C);
+    expect(trend.every((point) => point.count === 0)).toBe(true);
+  });
+});
+
+describe('longMcRoster', () => {
+  test('lists only the long episodes, longest first', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'S1', name: 'SHORT', start_date: '2026-08-01', end_date: '2026-08-04', num_days: 4 }),
+      episodeRow({ four_d: 'M1', name: 'MID', start_date: '2026-08-01', end_date: '2026-08-07' }),
+      episodeRow({ four_d: 'L1', name: 'LONG', start_date: '2026-08-01', end_date: '2026-08-20' }),
+    ]);
+    const roster = longMcRoster(episodes, DUTY_CLASS.ATT_C);
+    expect(roster.map((row) => row.name)).toEqual(['LONG', 'MID']);
+    expect(roster[0].days).toBe(20);
+    expect(roster[0].startDate).toBe('2026-08-01');
+    expect(roster[0].endDate).toBe('2026-08-20');
+  });
+
+  test('carries company and platoon, defaulting platoon to unassigned', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'N1', name: 'NOPLT', platoon: '', start_date: '2026-08-01', end_date: '2026-08-09' }),
+    ]);
+    const roster = longMcRoster(episodes, DUTY_CLASS.ATT_C);
+    expect(roster[0].company).toBe('Cougar');
+    expect(roster[0].platoon).toBe(UNASSIGNED);
+  });
+
+  test('a soldier with two long episodes gets a row each', () => {
+    const episodes = episodesFrom([
+      episodeRow({ four_d: 'T1', name: 'TWICE', start_date: '2026-08-01', end_date: '2026-08-10' }),
+      episodeRow({ four_d: 'T1', name: 'TWICE', start_date: '2026-09-01', end_date: '2026-09-08' }),
+    ]);
+    const roster = longMcRoster(episodes, DUTY_CLASS.ATT_C);
+    expect(roster).toHaveLength(2);
+    expect(roster.map((row) => row.days)).toEqual([10, 8]);
   });
 });

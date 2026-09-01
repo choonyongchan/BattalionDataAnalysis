@@ -21,7 +21,8 @@
 import { classify, DUTY_CLASS, extractSymptoms, isAbsent, isRestricted } from './classify.js';
 import { identityOf } from './episodes.js';
 import { COMPANIES, PLATOONS, UNIT_TYPE_COMPANY } from './schema.js';
-import { toIsoDate, toNumber, toText, weekdayOf } from './normalize.js';
+import { inclusiveDaySpan, toIsoDate, toNumber, toText, weekdayOf } from './normalize.js';
+import { eachDay, withinRange } from './daterange.js';
 
 /** @type {number} Absolute z-score at or above which a unit is flagged as an outlier. */
 export const OUTLIER_Z = 2;
@@ -611,6 +612,95 @@ export function categoryTrend(personnelRows, strengthRows, dutyClass, session) {
       companiesReporting: strength.companiesReporting.length,
     };
   });
+}
+
+/**
+ * The length of an episode in days, for the long-MC test.
+ *
+ * The stated day count wins when the message gave one, exactly as the rest of the Att
+ * C section reads duration. With no stated count it is the start-to-end span, where a
+ * missing `start_date` has already fallen back to the first parade date the soldier
+ * was seen absent and a missing `end_date` to the last.
+ * @param {!Object} episode An episode from `buildEpisodes`.
+ * @returns {number} The length in whole days.
+ */
+function episodeDays_(episode) {
+  if (episode.statedDays !== null && episode.statedDays > 0) {
+    return episode.statedDays;
+  }
+  return inclusiveDaySpan(episode.startDate, episode.endDate);
+}
+
+/**
+ * The long episodes of one duty class: length greater than `minDays`.
+ * @param {Array<!Object>} episodes Episodes to filter.
+ * @param {string} dutyClass Duty class to keep, from DUTY_CLASS.
+ * @param {number} minDays Length a long episode must exceed.
+ * @returns {Array<!Object>} The matching episodes.
+ */
+function longEpisodes_(episodes, dutyClass, minDays) {
+  return episodes.filter(
+    (episode) =>
+      episode.dutyClass === dutyClass &&
+      episode.startDate &&
+      episode.endDate &&
+      episodeDays_(episode) > minDays
+  );
+}
+
+/**
+ * How many distinct soldiers are on a long episode of `dutyClass` on each calendar day.
+ *
+ * A long MC is one that lasts more than `minDays` days. A soldier is counted on every
+ * day their episode covers, `[startDate, endDate]` inclusive, so a fortnight's MC adds
+ * one to fourteen days of the line. Two overlapping long episodes for the same soldier
+ * still count once, because the question is how many people are away, not how many
+ * certificates are open.
+ * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
+ * @param {?string} fromIso First day to report, ISO 'yyyy-MM-dd'.
+ * @param {?string} toIso Last day to report, ISO 'yyyy-MM-dd'.
+ * @param {string} dutyClass Duty class to trend, from DUTY_CLASS.
+ * @param {number=} minDays Length a long episode must exceed; defaults to 4.
+ * @returns {Array<{date: string, count: number}>} One entry per day, oldest first.
+ */
+export function longMcTrend(episodes, fromIso, toIso, dutyClass, minDays = 4) {
+  const long = longEpisodes_(episodes, dutyClass, minDays);
+  return eachDay(fromIso, toIso).map((day) => {
+    const soldiers = new Set();
+    long.forEach((episode) => {
+      if (withinRange(day, episode.startDate, episode.endDate)) {
+        soldiers.add(episode.key);
+      }
+    });
+    return { date: day, count: soldiers.size };
+  });
+}
+
+/**
+ * One row per long episode of `dutyClass`, longest first.
+ *
+ * One person with two long episodes appears twice: each long MC is its own row, since
+ * the table answers "which are the longest MCs, and whose". Ties break on the earlier
+ * start date.
+ * @param {Array<!Object>} episodes Episodes from `buildEpisodes`.
+ * @param {string} dutyClass Duty class to list, from DUTY_CLASS.
+ * @param {number=} minDays Length a long episode must exceed; defaults to 4.
+ * @returns {Array<!Object>} One row per long episode, longest first.
+ */
+export function longMcRoster(episodes, dutyClass, minDays = 4) {
+  return longEpisodes_(episodes, dutyClass, minDays)
+    .map((episode) => ({
+      key: episode.key,
+      fourD: episode.fourD,
+      name: episode.name,
+      rank: episode.rank,
+      company: episode.company,
+      platoon: episode.platoon || UNASSIGNED,
+      days: episodeDays_(episode),
+      startDate: episode.startDate,
+      endDate: episode.endDate,
+    }))
+    .sort((a, b) => b.days - a.days || a.startDate.localeCompare(b.startDate));
 }
 
 /**

@@ -27,6 +27,8 @@ import {
   dataQuality,
   durationDistribution,
   leaderboard,
+  longMcRoster,
+  longMcTrend,
   median,
   symptomCounts,
   unitRates,
@@ -142,6 +144,67 @@ function headcountCard_(view, spec) {
       ]),
     },
   });
+}
+
+/**
+ * The running load of long MCs: the daily headcount, and who is on one.
+ *
+ * A long MC is one that lasts more than four days — long enough that the soldier
+ * cannot be planned against for a stretch. The line counts how many people that is on
+ * each calendar day; the table names them, longest MC first, so the load has faces.
+ * @param {!Object} view The snapshot.
+ * @param {!Object} spec The category.
+ * @returns {Array<Node>} The chart card and the roster card.
+ */
+function longMcPanels_(view, spec) {
+  const episodes = episodesOf_(view, spec);
+  const trend = longMcTrend(episodes, view.firstDate, view.lastDate, spec.dutyClass);
+  const roster = longMcRoster(episodes, spec.dutyClass);
+
+  const chart = chartCard({
+    title: 'On long ' + spec.full + ' over time',
+    note:
+      'A long ' +
+      spec.full +
+      ' is more than 4 days. Each soldier is counted on every day their episode covers.',
+    render: (node) =>
+      lineChart(node, {
+        dates: trend.map((point) => fmtDate(point.date)),
+        series: [{ name: 'soldiers', values: trend.map((point) => point.count) }],
+        valueName: 'soldiers',
+      }),
+    table: {
+      columns: [{ label: 'Date' }, { label: 'Soldiers', numeric: true }],
+      rows: trend.map((point) => [fmtDate(point.date), fmtInt(point.count)]),
+    },
+  });
+
+  const rosterCard = el('section', 'card', [
+    el('div', 'card__head', [el('h3', 'card__title', 'Who is on long ' + spec.noun)]),
+    el('p', 'card__note', 'One row per ' + spec.noun + ' over 4 days, longest first.'),
+    roster.length === 0
+      ? banner('info', 'None', 'No ' + spec.noun + ' over 4 days in this range.')
+      : table(
+          [
+            { label: 'Soldier' },
+            { label: 'Coy' },
+            { label: 'Plt' },
+            { label: 'Days', numeric: true },
+            { label: 'Start' },
+            { label: 'End' },
+          ],
+          roster.slice(0, 20).map((entry) => [
+            (entry.rank ? entry.rank + ' ' : '') + (entry.name || entry.fourD || '—'),
+            entry.company || '—',
+            entry.platoon,
+            fmtInt(entry.days),
+            fmtDate(entry.startDate),
+            fmtDate(entry.endDate),
+          ])
+        ),
+  ]);
+
+  return [chart, rosterCard];
 }
 
 /**
@@ -502,6 +565,7 @@ export function renderCategory(view, spec) {
         (view.firstDate ? ' · ' + fmtDate(view.firstDate) + ' to ' + fmtDate(view.lastDate) : '')
     ),
     el('div', 'grid-2', [trendCard_(view, spec), headcountCard_(view, spec)]),
+    ...(spec.showLongMc ? longMcPanels_(view, spec) : []),
     sectionHead('Where is it?'),
     companyCard_(view, spec),
     platoonCard_(view, spec),

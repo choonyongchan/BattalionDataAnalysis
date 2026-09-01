@@ -75,6 +75,28 @@ export function overlapsRange(startIso, endIso, from, to) {
 }
 
 /**
+ * Every ISO date from `from` to `to`, inclusive of both ends, in order.
+ *
+ * The calendar-day counterpart of `daysOfMonth`, for a metric that changes every day
+ * rather than every parade: a soldier on a long MC is away on the weekend too, even
+ * though no parade names them. Returns `[]` when either bound is missing or when `to`
+ * precedes `from`, so a caller can map over it without a guard.
+ * @param {?string} from Inclusive first day, ISO 'yyyy-MM-dd'.
+ * @param {?string} to Inclusive last day, ISO 'yyyy-MM-dd'.
+ * @returns {Array<string>} ISO 'yyyy-MM-dd' for each day in the range.
+ */
+export function eachDay(from, to) {
+  if (!from || !to || to < from) {
+    return [];
+  }
+  const days = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) {
+    days.push(day);
+  }
+  return days;
+}
+
+/**
  * Resolves a named quick-range preset to a concrete `{ from, to }` pair.
  *
  * `today` is passed in rather than read here so the caller controls the clock and the
