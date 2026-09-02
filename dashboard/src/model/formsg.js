@@ -14,8 +14,9 @@
  */
 
 import { extractSymptoms, keywords } from './classify.js';
-import { normaliseName, toIsoDate, toText } from './normalize.js';
-import { COMPANIES } from './schema.js';
+import { normaliseName } from './identity.js';
+import { toIsoDate, toText } from './values.js';
+import { COMPANIES } from './domain.js';
 
 /**
  * Finds the company named in a free-text unit answer.

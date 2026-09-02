@@ -54,7 +54,8 @@ const DASHBOARD_PASSWORD_KEY = 'DASHBOARD_PASSWORD';
  * A tab that does not exist is reported as absent rather than failing the request.
  * The FormSG intake is genuinely optional, and a battalion that has not set it up
  * should still get a working dashboard instead of an error naming a tab they have
- * never heard of.
+ * never heard of. The same holds for the two settings tabs, which an operator creates
+ * by hand.
  * @type {string[]}
  */
 const DASHBOARD_TABS = [
@@ -62,7 +63,25 @@ const DASHBOARD_TABS = [
   'Personnel Data',
   'Command Roster',
   'Report Sick FormSG Responses',
+  'Public Holidays',
+  'Rotations',
 ];
+
+/**
+ * Tabs read as a projection: only the named columns leave the server.
+ *
+ * `Parade State Responses` answers one question the output tabs cannot — when each
+ * company filed. Its `Timestamp` and `parade_response_id` carry that answer. Its second
+ * column does not: `Drop your Parade State here` is the free text a duty commander typed,
+ * and observed messages hold NRICs, full names and diagnoses in one blob. Reading the
+ * whole tab and letting the dashboard ignore the body would still have sent it across the
+ * wire, into the browser's memory, and into anything watching. So the projection happens
+ * here, before the row is serialised, and `test/dashboard.feed.test.js` pins it.
+ * @type {!Object<string, string[]>}
+ */
+const DASHBOARD_TAB_PROJECTIONS = {
+  'Parade State Responses': ['Timestamp', 'parade_response_id'],
+};
 
 /** @type {string} Script-cache key counting recent failed password attempts. */
 const DASHBOARD_FAILURE_KEY = 'dashboard_failed_attempts';
@@ -204,15 +223,43 @@ class DashboardFeed {
     const spreadsheet = SpreadsheetApp.getActive();
     const timeZone = spreadsheet.getSpreadsheetTimeZone();
     const tabs = {};
-    DASHBOARD_TABS.forEach((name) => {
+    const names = DASHBOARD_TABS.concat(Object.keys(DASHBOARD_TAB_PROJECTIONS));
+    names.forEach((name) => {
       const sheet = spreadsheet.getSheetByName(name);
       if (!sheet) {
         Logger.log(`Dashboard: tab "${name}" does not exist; reporting it as absent.`);
         return;
       }
-      tabs[name] = DashboardFeed.readSheet_(sheet, timeZone);
+      const projection = DASHBOARD_TAB_PROJECTIONS[name];
+      tabs[name] = projection
+        ? DashboardFeed.readColumns_(sheet, projection, timeZone)
+        : DashboardFeed.readSheet_(sheet, timeZone);
     });
     return tabs;
+  }
+
+  /**
+   * Reads only the named columns of a sheet, header row included.
+   *
+   * Columns are located by header name rather than index, for the same reason the
+   * dashboard resolves them that way: a column added upstream must not silently change
+   * which one is read. A header the sheet does not have is omitted from the result, which
+   * the dashboard then reports as a missing column — a loud failure, not a wrong chart.
+   * @param {!GoogleAppsScript.Spreadsheet.Sheet} sheet The sheet to read.
+   * @param {string[]} headers The headers to return, in the order wanted.
+   * @param {string} timeZone The spreadsheet's timezone, for rendering dates.
+   * @returns {!Array<!Array<*>>} Cell values, row-major, header row first.
+   * @private
+   */
+  static readColumns_(sheet, headers, timeZone) {
+    const values = DashboardFeed.readSheet_(sheet, timeZone);
+    if (values.length === 0) {
+      return [];
+    }
+    const positions = headers
+      .map((header) => values[0].indexOf(header))
+      .filter((position) => position >= 0);
+    return values.map((row) => positions.map((position) => row[position]));
   }
 
   /**

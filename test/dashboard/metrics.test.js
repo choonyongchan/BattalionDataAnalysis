@@ -24,11 +24,11 @@ import {
   topReasonsOn,
   UNASSIGNED,
   unitRates,
-} from '../../dashboard/js/model/metrics.js';
-import { DUTY_CLASS } from '../../dashboard/js/model/classify.js';
-import { buildEpisodes } from '../../dashboard/js/model/episodes.js';
-import { toRecords } from '../../dashboard/js/model/normalize.js';
-import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../dashboard/js/model/schema.js';
+} from '../../dashboard/src/model/metrics.js';
+import { DUTY_CLASS } from '../../dashboard/src/model/classify.js';
+import { buildEpisodes } from '../../dashboard/src/model/episodes.js';
+import { toRecords } from '../../dashboard/src/data/records.js';
+import { PERSONNEL_HEADERS, STRENGTH_HEADERS, TABS } from '../../dashboard/src/data/tabs.js';
 import { personnelValues, strengthValues } from './fixtures.js';
 
 describe('median', () => {

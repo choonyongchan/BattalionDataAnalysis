@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { reportSickTypeCounts, toSubmissions } from '../../dashboard/js/model/formsg.js';
+import { reportSickTypeCounts, toSubmissions } from '../../dashboard/src/model/formsg.js';
 
 /**
  * A FormSG response row, as `toSubmissions` reads it: an object keyed by header.

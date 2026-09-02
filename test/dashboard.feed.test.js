@@ -28,7 +28,22 @@ const STRENGTH_TAB = [
 ];
 
 /**
- * Seeds the four tabs the dashboard asks for.
+ * A parade-state intake tab whose message body holds exactly what must never travel.
+ * @type {!Array<!Array<*>>}
+ */
+const RAW_RESPONSES_TAB = [
+  ['Timestamp', 'Drop your Parade State here', 'wa_message_id', 'parade_response_id', 'error'],
+  [
+    new Date('2026-06-22T07:12:00+08:00'),
+    'REPORT SICK: 01\nREC LEE YIKZH (4405)\nNRIC: T0573638I\nDIAGNOSIS: COUGH',
+    'wamid.1',
+    'Archer_2026-06-22_FPS',
+    '',
+  ],
+];
+
+/**
+ * Seeds every tab the dashboard asks for.
  * @returns {!Object<string, !Array<!Array<*>>>} Tab name to values.
  */
 function allTabs() {
@@ -37,6 +52,9 @@ function allTabs() {
     'Personnel Data': [['name', 'reason_category'], ['TAN AH KOW', 'Att C']],
     'Command Roster': [['date', 'role', 'name'], ['2026-06-22', 'CDO', '2LT RYAN']],
     'Report Sick FormSG Responses': [['Timestamp'], [new Date('2026-08-31T14:47:26+08:00')]],
+    'Parade State Responses': RAW_RESPONSES_TAB,
+    'Public Holidays': [['date', 'name'], ['2026-08-09', 'National Day']],
+    Rotations: [['name', 'start_date', 'end_date'], ['Rot 1', '2026-07-01', '2026-09-30']],
   };
 }
 
@@ -58,8 +76,11 @@ describe('the password guard', () => {
     expect(reply.ok).toBe(true);
     expect(Object.keys(reply.tabs).sort()).toEqual([
       'Command Roster',
+      'Parade State Responses',
       'Personnel Data',
+      'Public Holidays',
       'Report Sick FormSG Responses',
+      'Rotations',
       'Strength Data',
     ]);
   });
@@ -247,13 +268,56 @@ describe('what comes back', () => {
     expect(ask(env, { password: DASHBOARD_TEST_PASSWORD }).tabs['Personnel Data']).toEqual([]);
   });
 
-  test('asks for exactly the four tabs the dashboard reads', () => {
+  test('asks for exactly the tabs the dashboard reads', () => {
     const env = loadDashboard({ tabs: allTabs() });
     expect(env.globals.DASHBOARD_TABS).toEqual([
       'Strength Data',
       'Personnel Data',
       'Command Roster',
       'Report Sick FormSG Responses',
+      'Public Holidays',
+      'Rotations',
+    ]);
+  });
+
+  test('reads the parade-state tab as a projection of two columns', () => {
+    const env = loadDashboard({ tabs: allTabs() });
+    expect(env.globals.DASHBOARD_TAB_PROJECTIONS['Parade State Responses']).toEqual([
+      'Timestamp',
+      'parade_response_id',
+    ]);
+  });
+
+  test('the parade-state message body never crosses the boundary', () => {
+    // This is the assertion the projection exists for. The body is free text a duty
+    // commander typed, and real messages carry NRICs, full names and diagnoses in one
+    // blob. Asserting on the whole reply, rather than on that one tab, is deliberate:
+    // it catches the body arriving anywhere at all.
+    const env = loadDashboard({ tabs: allTabs() });
+    const reply = ask(env, { password: DASHBOARD_TEST_PASSWORD });
+
+    expect(JSON.stringify(reply)).not.toContain('T0573638I');
+    expect(JSON.stringify(reply)).not.toContain('Drop your Parade State here');
+    expect(reply.tabs['Parade State Responses']).toEqual([
+      ['Timestamp', 'parade_response_id'],
+      ['2026-06-22T07:12:00', 'Archer_2026-06-22_FPS'],
+    ]);
+  });
+
+  test('a projected tab missing a column returns the ones it has, not blanks', () => {
+    // The dashboard resolves columns by name and reports a missing one loudly. Padding
+    // the row here would hand it a column of empty strings under the right header, which
+    // reads as "every parade state was filed at no time in particular".
+    const tabs = allTabs();
+    tabs['Parade State Responses'] = [
+      ['Drop your Parade State here', 'parade_response_id'],
+      ['some text', 'Archer_2026-06-22_FPS'],
+    ];
+    const env = loadDashboard({ tabs });
+
+    expect(ask(env, { password: DASHBOARD_TEST_PASSWORD }).tabs['Parade State Responses']).toEqual([
+      ['parade_response_id'],
+      ['Archer_2026-06-22_FPS'],
     ]);
   });
 

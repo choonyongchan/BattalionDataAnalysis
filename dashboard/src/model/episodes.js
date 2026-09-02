@@ -18,37 +18,10 @@
  */
 
 import { classify, extractSymptoms } from './classify.js';
-import {
-  PERM_STATUS_NUM_DAYS,
-  inclusiveDaySpan,
-  isoToUtcMs,
-  normaliseName,
-  toIsoDate,
-  toNumber,
-  toText,
-} from './normalize.js';
-
-/**
- * Identity key for a soldier.
- *
- * `four_d` is the real identifier and is preferred wherever present. It is blank on 14%
- * of personnel rows in the real data, so the normalised name is the fallback —
- * weaker, since two soldiers can share a name, but far better than dropping the row and
- * understating that soldier's history.
- * @param {!Object} row A normalised Personnel Data record.
- * @returns {{key: string, source: string}} The identity key, and which field produced it.
- */
-export function identityOf(row) {
-  const fourD = toText(row.four_d).toUpperCase();
-  if (fourD !== '') {
-    return { key: '4D:' + fourD, source: 'four_d' };
-  }
-  const name = normaliseName(row.name);
-  if (name !== '') {
-    return { key: 'NAME:' + name, source: 'name' };
-  }
-  return { key: '', source: 'none' };
-}
+import { PERM_STATUS_NUM_DAYS } from './domain.js';
+import { identityOf } from './identity.js';
+import { inclusiveDaySpan, isoToUtcMs } from './dates.js';
+import { toIsoDate, toNumber, toText } from './values.js';
 
 /**
  * Groups rows that share a non-blank `start_date`, and runs of consecutive parade dates

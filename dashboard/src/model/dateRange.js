@@ -7,7 +7,7 @@
  * be unit-tested and reused by `snapshot()` without pulling in the view layer.
  */
 
-import { addDays } from './normalize.js';
+import { addDays } from './dates.js';
 
 /**
  * Today's date in the viewer's own timezone, as ISO 'yyyy-MM-dd'.

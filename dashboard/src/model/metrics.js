@@ -19,10 +19,11 @@
  */
 
 import { classify, DUTY_CLASS, extractSymptoms, isAbsent, isRestricted } from './classify.js';
-import { identityOf } from './episodes.js';
-import { COMPANIES, PLATOONS, UNIT_TYPE_COMPANY } from './schema.js';
-import { inclusiveDaySpan, toIsoDate, toNumber, toText, weekdayOf } from './normalize.js';
-import { eachDay, withinRange } from './daterange.js';
+import { identityOf } from './identity.js';
+import { COMPANIES, PLATOONS, UNIT_TYPE_COMPANY } from './domain.js';
+import { inclusiveDaySpan, weekdayOf } from './dates.js';
+import { toIsoDate, toNumber, toText } from './values.js';
+import { eachDay, withinRange } from './dateRange.js';
 
 /** @type {number} Absolute z-score at or above which a unit is flagged as an outlier. */
 export const OUTLIER_Z = 2;

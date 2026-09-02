@@ -2,8 +2,9 @@
 #
 # Deploy-from-a-branch only offers "/" or "/docs" as the source folder, and "docs/" here
 # already holds the architecture reference — so an Actions workflow is what lets Pages
-# serve "dashboard/". There is no build step: the directory is plain ES modules and CSS,
-# and it is uploaded exactly as it sits in the repo. Its tests live in "test/dashboard/",
+# serve the dashboard. What is published is "dashboard/dist", the Vite build, not the
+# source: the pages are Preact components and the stylesheet is split across five files,
+# neither of which a browser can be handed directly. Its tests live in "test/dashboard/",
 # outside that boundary, for the same reason "test/" sits outside "src/" — what ships is
 # only what runs in the browser.
 #
@@ -58,11 +59,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/configure-pages@v5
-      - name: Upload the dashboard directory
+      - name: Install dashboard dependencies
+        run: bun install --frozen-lockfile
+        working-directory: dashboard
+      - name: Build the dashboard
+        run: bun run build
+        working-directory: dashboard
+      - name: Upload the built dashboard
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dashboard
+          path: dashboard/dist
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

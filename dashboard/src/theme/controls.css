@@ -1,0 +1,111 @@
+/*
+ * Things you press and type into.
+ *
+ * Three button grammars, and no fourth. DESIGN.md's rule is that the radius carries the
+ * meaning, so they are kept distinct on purpose:
+ *
+ *   --primary   a full pill, Action Blue. The one action on a screen. Login, and nowhere
+ *               else so far — a dashboard that reads and never writes has few actions.
+ *   --quiet     an 8px rect, no fill. Session and view controls: lock, theme, chart or
+ *               table, open the rail.
+ *   --toggle    a pill in a segmented group. Choices between views of the same data:
+ *               Battalion or Companies, Daily or Weekly.
+ *
+ * Every one takes the system press state from base.css. None of them takes a shadow.
+ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.button--primary {
+  min-height: 48px;
+  padding: 11px 26px;
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  border-radius: var(--radius-pill);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.button--quiet {
+  min-height: 36px;
+  padding: 7px var(--space-sm);
+  color: var(--ink-muted);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+
+.button--quiet:hover {
+  background: var(--hairline-soft);
+  color: var(--ink);
+}
+
+/* A segmented group: one choice at a time, all options visible. */
+.toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--canvas-sunken);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-pill);
+}
+
+.button--toggle {
+  min-height: 30px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-muted);
+  font-size: 14px;
+  letter-spacing: -0.224px;
+}
+
+.button--toggle[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Inputs and selects share one shape so a control row reads as one row. */
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 40px;
+  padding: 0 var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.field--pill {
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-lg);
+}
+
+select.field {
+  padding-right: var(--space-sm);
+}
+
+.field__label {
+  display: block;
+  margin-bottom: var(--space-xxs);
+  font-size: 12px;
+  letter-spacing: -0.12px;
+  color: var(--ink-muted);
+}

@@ -6,6 +6,11 @@
  * single source of truth for the layout; these tests assert the dashboard only asks for
  * headers those files still define. Without them, an upstream rename would ship a blank
  * chart instead of a failing build.
+ *
+ * The two settings tabs — Public Holidays and Rotations — have no upstream owner. Nothing
+ * in `src/` writes them; an operator creates them by hand. `tabs.js` is their definition,
+ * so there is nothing here to cross-check them against, and asserting a copy against
+ * itself would only look like coverage.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -13,14 +18,19 @@ import { loadFormSg } from '../harness.js';
 import { parserGlobals } from './fixtures.js';
 import {
   COMPANIES,
+  PLATOONS,
+  SESSIONS,
+  UNIT_TYPE_COMPANY,
+} from '../../dashboard/src/model/domain.js';
+import {
   FORBIDDEN_HEADERS,
+  FORBIDDEN_SUBMISSION_HEADERS,
   FORMSG_HEADERS,
   PERSONNEL_HEADERS,
   ROSTER_HEADERS,
-  SESSIONS,
   STRENGTH_HEADERS,
-  UNIT_TYPE_COMPANY,
-} from '../../dashboard/js/model/schema.js';
+  SUBMISSION_HEADERS,
+} from '../../dashboard/src/data/tabs.js';
 
 /** @type {!Object} Apps Script globals for the parade-state pipeline. */
 const parser = parserGlobals();
@@ -52,6 +62,12 @@ describe('dashboard header requirements', () => {
       expect(formSg.FORMSG_COLUMNS).toContain(header);
     });
   });
+
+  test('every Parade State Responses header the dashboard reads exists upstream', () => {
+    SUBMISSION_HEADERS.forEach((header) => {
+      expect(parser.RAW_RESPONSES_COLUMNS).toContain(header);
+    });
+  });
 });
 
 describe('NRIC columns are never requested', () => {
@@ -68,6 +84,20 @@ describe('NRIC columns are never requested', () => {
   });
 });
 
+describe('the parade-state message body is never requested', () => {
+  test('the forbidden header is a real column, so the exclusion is meaningful', () => {
+    FORBIDDEN_SUBMISSION_HEADERS.forEach((header) => {
+      expect(parser.RAW_RESPONSES_COLUMNS).toContain(header);
+    });
+  });
+
+  test('it does not appear in what the dashboard asks for', () => {
+    FORBIDDEN_SUBMISSION_HEADERS.forEach((header) => {
+      expect(SUBMISSION_HEADERS).not.toContain(header);
+    });
+  });
+});
+
 describe('enums mirror the parser', () => {
   test('the company list matches', () => {
     expect(COMPANIES).toEqual(parser.COMPANIES);
@@ -79,5 +109,10 @@ describe('enums mirror the parser', () => {
 
   test('the company-total unit type matches', () => {
     expect(UNIT_TYPE_COMPANY).toBe(parser.UNIT_TYPES.COMPANY);
+  });
+
+  test('the platoon roll excludes the command element and the company total', () => {
+    expect(PLATOONS).not.toContain(parser.UNIT_TYPES.COMMAND_ELEMENT);
+    expect(PLATOONS).not.toContain(parser.UNIT_TYPES.COMPANY);
   });
 });

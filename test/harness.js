@@ -607,7 +607,8 @@ export function loadDashboard(options) {
 
   const epilogue = `;({
     DashboardFeed, doPost, WEB_APP_ROUTES,
-    DASHBOARD_TABS, DASHBOARD_PASSWORD_KEY, FAILURE_LIMIT, LOCKOUT_SECONDS,
+    DASHBOARD_TABS, DASHBOARD_TAB_PROJECTIONS,
+    DASHBOARD_PASSWORD_KEY, FAILURE_LIMIT, LOCKOUT_SECONDS,
   })`;
 
   const globals = vm.runInContext(sources.join('\n') + epilogue, context, {

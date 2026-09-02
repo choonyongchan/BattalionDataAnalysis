@@ -20,7 +20,7 @@
  * Every function here is pure.
  */
 
-import { toText } from './normalize.js';
+import { toText } from './values.js';
 
 /**
  * The duty classes the dashboard reports, keyed by `reason_category`.

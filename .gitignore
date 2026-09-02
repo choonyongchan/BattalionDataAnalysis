@@ -1,5 +1,8 @@
 node_modules/
 .clasp.json
+
+# The dashboard's Vite build. CI rebuilds it; a committed copy only goes stale.
+dashboard/dist/
 whatsapp/node_modules/
 whatsapp/.env
 whatsapp/auth/

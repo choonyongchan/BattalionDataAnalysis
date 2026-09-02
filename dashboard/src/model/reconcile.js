@@ -16,8 +16,8 @@
  * function is pure.
  */
 
-import { normaliseName } from './normalize.js';
-import { COMPANIES } from './schema.js';
+import { normaliseName } from './identity.js';
+import { COMPANIES } from './domain.js';
 
 /** Rank tokens that may survive into a name field and must not drive a match. */
 const RANKS = new Set([

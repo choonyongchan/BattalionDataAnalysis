@@ -16,7 +16,7 @@ import {
   isAbsent,
   isRestricted,
   keywords,
-} from '../../dashboard/js/model/classify.js';
+} from '../../dashboard/src/model/classify.js';
 
 describe('MC is Att C, matched by category', () => {
   test('an Att C row is MC whatever its reason says', () => {
