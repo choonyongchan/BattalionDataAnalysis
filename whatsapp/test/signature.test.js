@@ -25,6 +25,9 @@ describe('isParadeState - chatter', () => {
       'a long message with the anchor but no structure',
       Array.from({ length: 20 }, () => 'Reminder to submit the parade state on time please.').join('\n'),
     ],
+    ['a p.s. aside', 'P.S. bring water'],
+    ['a terse FPS one-liner with no body', '40 SAR ARCHER COY FPS'],
+    ['an fps mention mid-sentence', 'can you resend the fps for today'],
   ];
 
   for (const [label, text] of negatives) {
@@ -45,6 +48,12 @@ describe('isParadeState - chatter', () => {
 describe('isParadeState - verdict shape', () => {
   test('explains why a near-miss was rejected', () => {
     const result = isParadeState('Why is your parade state late?');
+    expect(result.rejectReason).toContain('too few lines');
+  });
+
+  test('a terse FPS one-liner is rejected for bulk, not for the marker', () => {
+    const result = isParadeState('40 SAR ARCHER COY FPS');
+    expect(result.accepted).toBe(false);
     expect(result.rejectReason).toContain('too few lines');
   });
 });
@@ -100,6 +109,26 @@ describe('isParadeState - first parade gate', () => {
   test('rejects an unlabelled session with no timing at all', () => {
     expect(isParadeState(withHeader('COUGAR COMPANY PARADE STATE\nDATE: 220626')).accepted).toBe(false);
   });
+
+  test('accepts a terse "FPS" header with no anchor phrase', () => {
+    expect(isParadeState(withHeader('40 SAR ARCHER COY FPS\n220626')).accepted).toBe(true);
+  });
+
+  test('accepts a terse "FP" header with a morning timing', () => {
+    expect(isParadeState(withHeader('BRAVES COY FP\n0738')).accepted).toBe(true);
+  });
+
+  test('accepts a terse "FP" header even without a morning timing', () => {
+    expect(isParadeState(withHeader('BRAVES COY FP\n1500')).accepted).toBe(true);
+  });
+
+  test('rejects a terse "LPS" header', () => {
+    expect(isParadeState(withHeader('40 SAR BRAVES COY LPS\n220626 LP 1830')).accepted).toBe(false);
+  });
+
+  test('rejects a bare "PS" header', () => {
+    expect(isParadeState(withHeader('BRAVES COY PS\n1830')).accepted).toBe(false);
+  });
 });
 
 describe('first parade timing extraction', () => {
@@ -122,6 +151,29 @@ describe('first parade timing extraction', () => {
 
   test('ignores timings below the header block', () => {
     const text = ['PARADE STATE', 'line 2', 'line 3', 'line 4', 'line 5', '0730'].join('\n');
+    expect(isFirstParade(text)).toBe(false);
+  });
+});
+
+describe('first parade marker', () => {
+  test('reads an "FPS" token in the header', () => {
+    expect(isFirstParade('40 SAR ARCHER COY FPS\nl2\nl3\nl4\nl5')).toBe(true);
+  });
+
+  test('reads a bare "FP" token without needing a valid timing', () => {
+    expect(isFirstParade('BRAVES COY FP\nno timing here\nl3\nl4\nl5')).toBe(true);
+  });
+
+  test('does not treat "LPS" as a first-parade marker', () => {
+    expect(isFirstParade('BRAVES COY LPS\nl2\nl3\nl4\nl5')).toBe(false);
+  });
+
+  test('does not treat a bare "PS" as a first-parade marker', () => {
+    expect(isFirstParade('BRAVES COY PS\nl2\nl3\nl4\nl5')).toBe(false);
+  });
+
+  test('ignores an "FP" token that appears only below the header block', () => {
+    const text = ['PARADE STATE', 'l2', 'l3', 'l4', 'l5', 'FP 0700'].join('\n');
     expect(isFirstParade(text)).toBe(false);
   });
 });

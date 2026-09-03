@@ -9,6 +9,14 @@
  *
  * The session is QR-paired once and persisted under whatsapp/auth/, so ordinary
  * restarts do not require another scan.
+ *
+ * Reconnect keeps exactly one live socket. The old socket's listeners are
+ * removed and the socket ended before a new one is built, so a flaky link can
+ * never leave two sockets writing whatsapp/auth/ at once - concurrent writers
+ * corrupt the libsignal session and every later decrypt fails with "Bad MAC".
+ * When reconnects stop working the listener exits non-zero so the supervisor
+ * recycles the whole process, which rebuilds Baileys' in-memory state cleanly
+ * from auth/.
  */
 
 import { existsSync, mkdirSync } from 'node:fs';
@@ -19,8 +27,25 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 
-/** @type {number} Milliseconds to wait before reconnecting after a drop. */
-const RECONNECT_DELAY_MS = 3000;
+/** @type {number} Base delay before the first reconnect attempt. */
+const RECONNECT_BASE_MS = 3000;
+
+/** @type {number} Ceiling for the exponential reconnect backoff. */
+const RECONNECT_MAX_MS = 120000;
+
+/** @type {number} Consecutive failed reconnects before exiting for a clean restart. */
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+/**
+ * @type {Set<number>} Disconnect status codes that mean the session is dead or
+ * has been taken over. Reconnecting cannot fix any of these; the operator must
+ * wipe whatsapp/auth/ and pair again.
+ */
+const FATAL_STATUS = new Set([
+  DisconnectReason.loggedOut,
+  DisconnectReason.badSession,
+  DisconnectReason.connectionReplaced,
+]);
 
 /**
  * Extracts plain text from a Baileys message envelope.
@@ -68,39 +93,74 @@ export function isWatchedGroupMessage(envelope, groupId) {
 }
 
 /**
- * Connects to WhatsApp and streams messages from the watched group.
+ * Classifies a disconnect status code into the action the listener should take.
  *
- * The returned promise never resolves under normal operation; the function
- * reconnects itself on transient drops and only rejects when the session has
- * been logged out and a fresh QR scan is required.
- *
- * @param {Object} options Listener options.
- * @param {string} options.authDir Directory holding the persisted session.
- * @param {string} options.groupId JID of the group to watch, or an empty string
- *   to accept messages from every chat.
- * @param {import('pino').Logger} options.logger Logger for status output.
- * @param {function(string, Object): Promise<void>} options.onMessage Called with
- *   the message text and its Baileys envelope for each watched message.
- * @param {function(Object): Promise<void>} [options.onReady] Called with the
- *   live socket once the connection opens.
- * @returns {Promise<void>} Rejects when the session is logged out.
+ * @param {?number} statusCode The `lastDisconnect.error.output.statusCode`, or
+ *   undefined when Baileys gave none.
+ * @returns {'fatal'|'restart'|'retry'} `fatal` - session dead, give up and ask
+ *   for a re-pair; `restart` - reconnect immediately with no backoff (the normal
+ *   handshake step right after pairing); `retry` - reconnect with backoff.
  */
-export async function startListener(options) {
-  const { authDir, groupId, logger, onMessage, onReady } = options;
-
-  if (!existsSync(authDir)) {
-    mkdirSync(authDir, { recursive: true });
+export function classifyDisconnect(statusCode) {
+  if (FATAL_STATUS.has(statusCode)) {
+    return 'fatal';
   }
+  if (statusCode === DisconnectReason.restartRequired) {
+    return 'restart';
+  }
+  return 'retry';
+}
 
-  const { state, saveCreds } = await useMultiFileAuthState(authDir);
-  const { version } = await fetchLatestBaileysVersion();
-  const socket = makeWASocket({
+/**
+ * Backoff before the nth consecutive reconnect attempt.
+ *
+ * @param {number} attempt 1-based count of the reconnect about to be made.
+ * @returns {number} Milliseconds to wait: 3s doubling each attempt, capped at
+ *   RECONNECT_MAX_MS.
+ */
+export function reconnectDelayMs(attempt) {
+  return Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
+}
+
+/**
+ * Builds one configured Baileys socket.
+ *
+ * @param {Object} params Socket parameters.
+ * @param {Array<number>} params.version WhatsApp Web version from
+ *   fetchLatestBaileysVersion().
+ * @param {Object} params.state Auth state from useMultiFileAuthState().
+ * @param {import('pino').Logger} params.logger Logger for status output.
+ * @returns {Object} A live Baileys socket.
+ */
+function createSocket({ version, state, logger }) {
+  return makeWASocket({
     version,
     auth: state,
-    logger: logger.child({ component: 'baileys' }, { level: 'silent' }),
+    // 'warn' rather than 'silent' so connection-level trouble - including
+    // repeated session-decrypt failures - reaches the bridge log.
+    logger: logger.child({ component: 'baileys' }, { level: 'warn' }),
     browser: ['BattalionDataAnalysis', 'Chrome', '1.0.0'],
   });
+}
 
+/**
+ * Wires the message, credential and connection handlers onto a socket.
+ *
+ * @param {Object} params Handler parameters.
+ * @param {Object} params.socket The socket to attach to.
+ * @param {string} params.groupId JID of the group to watch, or '' for every chat.
+ * @param {import('pino').Logger} params.logger Logger for status output.
+ * @param {function(?string, Object): Promise<void>} params.onMessage Per-message
+ *   callback.
+ * @param {function(Object): Promise<void>} [params.onReady] Called with the
+ *   socket once the connection opens.
+ * @param {function(): (void|Promise<void>)} params.saveCreds Baileys credential
+ *   persister.
+ * @param {function(?number): void} params.onClose Called with the disconnect
+ *   status code when the connection closes.
+ * @returns {void}
+ */
+function attachHandlers({ socket, groupId, logger, onMessage, onReady, saveCreds, onClose }) {
   socket.ev.on('creds.update', saveCreds);
 
   socket.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -119,38 +179,156 @@ export async function startListener(options) {
     }
   });
 
-  return new Promise((resolve, reject) => {
-    socket.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
+  socket.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
-        logger.info('scan this QR code in WhatsApp > Linked devices');
-        qrcode.generate(qr, { small: true });
+    if (qr) {
+      logger.info('scan this QR code in WhatsApp > Linked devices');
+      qrcode.generate(qr, { small: true });
+    }
+
+    if (connection === 'open') {
+      logger.info('connected to WhatsApp');
+      if (onReady) {
+        await onReady(socket);
       }
+      return;
+    }
 
-      if (connection === 'open') {
-        logger.info('connected to WhatsApp');
-        if (onReady) {
-          await onReady(socket);
-        }
+    if (connection === 'close') {
+      onClose(lastDisconnect?.error?.output?.statusCode);
+    }
+  });
+}
+
+/**
+ * Removes every listener from a socket and ends it.
+ *
+ * Each step is wrapped so a throw while tearing down a half-broken socket never
+ * masks the disconnect reason that triggered the teardown.
+ *
+ * @param {Object} socket The socket to dispose of.
+ * @param {import('pino').Logger} logger Logger for teardown warnings.
+ * @returns {void}
+ */
+function teardownSocket(socket, logger) {
+  try {
+    socket.ev.removeAllListeners();
+  } catch (err) {
+    logger.warn({ err: err.message }, 'failed to remove socket listeners');
+  }
+  try {
+    socket.end(undefined);
+  } catch (err) {
+    logger.warn({ err: err.message }, 'failed to end socket');
+  }
+}
+
+/**
+ * Connects to WhatsApp and streams messages from the watched group.
+ *
+ * The returned promise never resolves under normal operation. It rejects only
+ * when a human is needed: with `err.fatal === true` when the session is dead and
+ * whatsapp/auth/ must be wiped, or without it when reconnects have failed
+ * MAX_RECONNECT_ATTEMPTS times in a row and the process should be recycled.
+ *
+ * @param {Object} options Listener options.
+ * @param {string} options.authDir Directory holding the persisted session.
+ * @param {string} options.groupId JID of the group to watch, or an empty string
+ *   to accept messages from every chat.
+ * @param {import('pino').Logger} options.logger Logger for status output.
+ * @param {function(string, Object): Promise<void>} options.onMessage Called with
+ *   the message text and its Baileys envelope for each watched message.
+ * @param {function(Object): Promise<void>} [options.onReady] Called with the
+ *   live socket once the connection opens.
+ * @returns {Promise<void>} Rejects when the listener needs operator action.
+ */
+export async function startListener(options) {
+  const { authDir, groupId, logger, onMessage, onReady } = options;
+
+  if (!existsSync(authDir)) {
+    mkdirSync(authDir, { recursive: true });
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(authDir);
+  const { version } = await fetchLatestBaileysVersion();
+
+  return new Promise((_resolve, reject) => {
+    let attempt = 0;
+    let closing = false;
+
+    /**
+     * Builds a fresh socket and arms its handlers.
+     * @returns {void}
+     */
+    function connect() {
+      closing = false;
+      const socket = createSocket({ version, state, logger });
+
+      attachHandlers({
+        socket,
+        groupId,
+        logger,
+        onMessage,
+        onReady: async (live) => {
+          attempt = 0;
+          if (onReady) {
+            await onReady(live);
+          }
+        },
+        saveCreds,
+        onClose: (statusCode) => handleClose(socket, statusCode),
+      });
+    }
+
+    /**
+     * Handles a `connection: 'close'` event: tear down the dead socket, then
+     * either reconnect or reject for operator action.
+     * @param {Object} socket The socket that just closed.
+     * @param {?number} statusCode The disconnect status code.
+     * @returns {void}
+     */
+    function handleClose(socket, statusCode) {
+      if (closing) {
+        return;
+      }
+      closing = true;
+      teardownSocket(socket, logger);
+
+      const kind = classifyDisconnect(statusCode);
+
+      if (kind === 'fatal') {
+        const err = new Error(
+          `WhatsApp session is dead (statusCode=${statusCode}). Delete whatsapp/auth/ and re-pair: ` +
+            'run `bun run reset-auth`, then `bun start`.'
+        );
+        err.fatal = true;
+        logger.error(err.message);
+        reject(err);
         return;
       }
 
-      if (connection !== 'close') {
+      if (kind === 'restart') {
+        logger.info({ statusCode }, 'WhatsApp asked for a restart; reconnecting now');
+        connect();
         return;
       }
 
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      if (statusCode === DisconnectReason.loggedOut) {
-        logger.error('session logged out - delete whatsapp/auth/ and re-scan the QR code');
-        reject(new Error('WhatsApp session logged out; re-pairing required.'));
+      attempt += 1;
+      if (attempt > MAX_RECONNECT_ATTEMPTS) {
+        reject(
+          new Error(
+            `WhatsApp reconnect failed ${MAX_RECONNECT_ATTEMPTS} times in a row; exiting for a clean restart.`
+          )
+        );
         return;
       }
 
-      logger.warn({ statusCode }, `connection closed, reconnecting in ${RECONNECT_DELAY_MS}ms`);
-      setTimeout(() => {
-        startListener(options).then(resolve, reject);
-      }, RECONNECT_DELAY_MS);
-    });
+      const delay = reconnectDelayMs(attempt);
+      logger.warn({ statusCode, attempt }, `connection closed, reconnecting in ${delay}ms`);
+      setTimeout(connect, delay);
+    }
+
+    connect();
   });
 }

@@ -72,15 +72,41 @@ exactly one `DRY_RUN` line, and the chatter logged at `debug` with a rejection r
 
 ## Running it permanently on Windows
 
-The bridge is a plain long-lived process. To start it at login, create a shortcut in
-`shell:startup` (Win+R → `shell:startup`) pointing at:
+`bun start` launches a supervisor (`src/supervisor.js`), not the bridge directly. The supervisor spawns
+`src/index.js` as a child, forwards its output, and restarts it on a crash **up to 3 consecutive times** with a
+growing backoff (3s, 15s, 60s). A child that stayed up for 5 minutes before crashing is treated as a fresh
+incident and the counter resets, so an occasional crash after hours of healthy running still gets the full
+three attempts. After the 3rd consecutive restart the supervisor prints a fatal banner and exits non-zero.
+A clean child exit (code 0), or the "session is dead" exit (code 3), is not restarted.
+
+`bun run start:bridge` runs the bridge unsupervised — use it for debugging.
+
+To start it at login, create a shortcut in `shell:startup` (Win+R → `shell:startup`) pointing at:
 
 ```
 cmd /c "cd /d C:\Users\Administrator\Documents\Projects\BattalionDataAnalysis\whatsapp && bun start >> bridge.log 2>&1"
 ```
 
-It only runs while the machine is awake and logged in. If uptime matters, move it to an always-on Linux host —
-nothing in the code is Windows-specific.
+That shortcut (or Task Scheduler with "restart on failure", which also survives reboots) is the outer layer
+that relaunches the supervisor itself after it gives up. It only runs while the machine is awake and logged
+in. If uptime matters, move it to an always-on Linux host — nothing in the code is Windows-specific.
+
+## Self-healing reconnect
+
+The listener holds **exactly one** Baileys socket at a time. On a dropped connection it removes the old
+socket's listeners and ends it *before* building a new one — two sockets writing `auth/` at once corrupt the
+libsignal session, and every later decrypt then fails with `Bad MAC`.
+
+Reconnect backoff is exponential: 3s, doubling each attempt, capped at 120s. After **5 consecutive failed
+reconnects** the listener exits non-zero, and the supervisor starts a fresh process — a clean rebuild of
+Baileys' in-memory state from `auth/` usually clears a wedged socket.
+
+`loggedOut`, `badSession` and `connectionReplaced` are fatal: the listener prints "delete whatsapp/auth/ and
+re-pair" and exits code 3, so the supervisor stops instead of looping into the same wall. Run
+`bun run reset-auth` (deletes `auth/`), then `bun start`, then scan the QR.
+
+An isolated `Bad MAC` on a single inbound message is handled inside Baileys — that one message is dropped and
+the socket keeps running. Nothing in the reconnect logic reacts to it.
 
 ## What gets relayed
 
@@ -92,11 +118,17 @@ thresholds were calibrated against real parade-state messages, the smallest of w
 970 characters. `"Why is your parade state late?"` carries the anchor phrase but is one short line, so it
 is rejected here.
 
-**First-parade gate** — the message must either carry an explicit `FIRST PARADE` / `FPS` marker, or have a
-timing before `12:00` in its header. The header is the first 5 non-empty lines, which is where every company
-puts its company / date / session / timing block; confining the search there keeps stray four-digit numbers in
-the body out of the check. The timing pattern uses digit lookaround so it reads `0738` out of `220626 FP 0738`
-without ever matching inside the `DDMMYY` date, and still matches when glued to a suffix (`0930HRS`).
+A header that carries only `FPS` or `FP` as a whole token clears the structural gate even without the literal
+words "PARADE STATE" — some companies label a first parade state that tersely. A bare `PS`, or `LP` / `LPS`
+(a last parade state), does not. The ≥ 8 lines / ≥ 200 characters minimums still apply, so a terse one-liner
+is still rejected.
+
+**First-parade gate** — the message must either carry an explicit `FIRST PARADE` / `FPS` / `FP` marker in its
+header, or have a timing before `12:00` in its header. The header is the first 5 non-empty lines, which is
+where every company puts its company / date / session / timing block; confining the search there keeps stray
+four-digit numbers — and a stray `FP` — in the body out of the check. The timing pattern uses digit lookaround
+so it reads `0738` out of `220626 FP 0738` without ever matching inside the `DDMMYY` date, and still matches
+when glued to a suffix (`0930HRS`).
 
 Of the five real samples, four carry an explicit marker (`FIRST PARADE STATE`, or the bare `FIRST PARADE` in
 `stallion.txt`); `braves.txt` is labelled only `PARADE STATE` and qualifies on its `0738` timing. A last parade
@@ -127,12 +159,14 @@ place that sees both is better than two that each see one.
 
 | File | Role |
 |---|---|
+| `src/supervisor.js` | Spawns and restarts the bridge process (this is what `bun start` runs) |
 | `src/index.js` | Wiring and the message handler |
 | `src/signature.js` | First-parade-state detection |
-| `src/listener.js` | Baileys socket, reconnects, envelope filtering |
+| `src/listener.js` | Baileys socket, single-socket reconnect, envelope filtering |
 | `src/appsScriptClient.js` | Relays an accepted message to the web app |
 | `src/config.js` | `.env` loading and validation |
 | `src/logger.js` | pino logger factory |
+| `scripts/reset-auth.js` | Wipes `auth/` for a clean re-pair (`bun run reset-auth`) |
 | `test/` | `bun test` — signature suite plus the non-network modules |
 
 `auth/` and `.env` hold live credentials and are git-ignored.
@@ -142,7 +176,10 @@ place that sees both is better than two that each see one.
 | Symptom | Cause |
 |---|---|
 | QR code appears on every start | `auth/` is not writable, or the device was unlinked in WhatsApp |
-| `session logged out` | Delete `auth/` and re-pair by running `bun start` and scanning again |
+| `session logged out` / `session is dead` | Run `bun run reset-auth`, then `bun start`, then scan the QR again |
+| Occasional `Bad MAC` in the log, bridge keeps running | One inbound message failed to decrypt; Baileys drops it. No action — if it was a parade state, ask the sender to resend |
+| Repeated `Bad MAC`, a reconnect loop, or `reconnect failed 5 times` | The libsignal session is corrupted or the device was unlinked. Stop the bridge, `bun run reset-auth`, `bun start`, re-scan |
+| Supervisor logs `giving up after 3 consecutive restarts` | The child crashed 3× in quick succession. Read the child's last error printed just above the banner, fix the root cause, then `bun start` |
 | `Apps Script rejected the relay: unauthorised` | `APPS_SCRIPT_TOKEN` here does not match the `WHATSAPP_INGEST_TOKEN` script property, or that property was never set |
 | `Apps Script rejected the relay: unknown_route` | `APPS_SCRIPT_URL` already carries a query string, or points at something other than the `/exec` URL |
 | `HTTP 404` on every relay | The web app was never deployed, or was deployed as a new *project* rather than a new *version* |

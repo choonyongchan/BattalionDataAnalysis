@@ -78,6 +78,9 @@ async function main() {
 if (import.meta.main) {
   main().catch((err) => {
     console.error(err.message);
-    process.exit(1);
+    // A fatal error (dead session, re-pair required) exits 3 so the supervisor
+    // stops instead of restarting into the same wall; anything else exits 1 so
+    // the supervisor recycles the process.
+    process.exit(err && err.fatal ? 3 : 1);
   });
 }

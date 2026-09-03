@@ -6,10 +6,17 @@
  * worth relaying, so chatter never reaches the spreadsheet.
  *
  * Two gates, in order:
- *   1. Cheap structural gates reject anything too short or missing the anchor
- *      phrase. This alone rejects near-misses such as
- *      "Why is your parade state late?".
+ *   1. Cheap structural gates reject anything too short, and anything that
+ *      carries neither the "parade state" anchor phrase nor a first-parade
+ *      marker ("FPS" / "FP") in its header. This alone rejects near-misses such
+ *      as "Why is your parade state late?".
  *   2. A first-parade gate, since only first parade states are processed.
+ *
+ * Gate 1 accepts a terse header: some companies label a first parade state with
+ * only "FPS" or "FP" and never write the words "parade state" at all. Those
+ * still carry the full strength and personnel body, so the line and character
+ * minimums below are what keep chatter out; the anchor phrase is no longer
+ * mandatory on its own.
  *
  * There used to be a third stage: a score over six layout signals (strength
  * lines, present/total ratios, unit tokens, bracketed rank groups and so on),
@@ -19,8 +26,9 @@
  * the score was a second, weaker copy of a judgement already being made
  * downstream. What it added was a way to drop a genuine parade state whose
  * layout was merely unusual, with the rejection recorded nowhere. A message
- * that clears the gates but is not a parade state now lands in Parade State
- * Errors as NEEDS_REVIEW, which is visible and reversible.
+ * that clears the gates but is not a parade state now lands on its own
+ * "Parade State Responses" row marked ERROR, with the reason beside it, which
+ * is visible and reversible.
  */
 
 /** @type {number} Minimum non-empty lines a parade state must have. */
@@ -40,10 +48,13 @@ const ANCHOR_PATTERN = /parade\s*state/i;
 const HEADER_LINES = 5;
 
 /**
- * @type {RegExp} Explicit first-parade markers. Matches "FIRST PARADE STATE"
- * (archer, cougar, hercules), the bare "FIRST PARADE" (stallion), and "FPS".
+ * @type {RegExp} A first-parade marker as a whole token: "FIRST PARADE" /
+ * "FIRST PARADE STATE" (archer, cougar, hercules, the bare form in stallion),
+ * "FPS", or a bare "FP". Applied to the header block only, so a stray "FP" in
+ * the body cannot trigger acceptance. Deliberately does not match a bare "PS",
+ * nor "LP" / "LPS" (a last parade state).
  */
-const FIRST_PARADE_PATTERN = /first\s*parade|\bFPS\b/i;
+const HEADER_MARKER_PATTERN = /first\s*parade(?:\s*state)?|\bFPS\b|\bFP\b/i;
 
 /**
  * @type {RegExp} A 24-hour HHMM timing such as 0830, 0715 or 1930.
@@ -83,6 +94,17 @@ export function extractHeader(text) {
 }
 
 /**
+ * Reports whether the header carries a first-parade marker.
+ *
+ * @param {string} header The message header block.
+ * @returns {boolean} True when the header contains "FIRST PARADE", "FPS" or a
+ *   bare "FP" as a whole token.
+ */
+function hasFirstParadeMarker(header) {
+  return HEADER_MARKER_PATTERN.test(header);
+}
+
+/**
  * Reports whether the header carries a timing before noon.
  *
  * Companies that do not label the session still stamp the header with the
@@ -112,7 +134,7 @@ function hasMorningTiming(header) {
  */
 export function isFirstParade(text) {
   const header = extractHeader(text);
-  return FIRST_PARADE_PATTERN.test(header) || hasMorningTiming(header);
+  return hasFirstParadeMarker(header) || hasMorningTiming(header);
 }
 
 /**
@@ -126,8 +148,11 @@ export function isParadeState(text) {
   if (typeof text !== 'string' || text.trim().length === 0) {
     return { accepted: false, rejectReason: 'empty message' };
   }
-  if (!ANCHOR_PATTERN.test(text)) {
-    return { accepted: false, rejectReason: 'missing "parade state" anchor phrase' };
+  if (!ANCHOR_PATTERN.test(text) && !hasFirstParadeMarker(extractHeader(text))) {
+    return {
+      accepted: false,
+      rejectReason: 'no "parade state" anchor phrase and no first-parade marker in the header',
+    };
   }
 
   const lineCount = countNonEmptyLines(text);
