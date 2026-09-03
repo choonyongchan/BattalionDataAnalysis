@@ -21,10 +21,10 @@
 export const FEED_URL =
   'https://script.google.com/macros/s/AKfycbz8_zMmzsdpfX2C0FHJNV7xqwupy1AbPaeoi8TQU_FHhLazYA8T1ozqctx7lisDjJda/exec?route=dashboard';
 
-/**
+/** 
  * Where the spreadsheet itself lives, for the "edit in Sheets" links on Settings.
  *
  * Empty when unknown: Settings then names the tab and its headers instead of linking.
  * @type {string}
  */
-export const SPREADSHEET_URL = '';
+export const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/19V3KpnCFmKMrXH4qrYtKzT7deK5jf4qniscZbKzJNF4';
