@@ -208,7 +208,7 @@ export function PresetBar({ from, to, today, onSelect }) {
         <button
           key={preset.name}
           type="button"
-          class="button--toggle"
+          class="button button--toggle"
           aria-pressed={active === preset.name}
           onClick={() => onSelect(preset.name)}
         >

@@ -12,7 +12,7 @@ export function ScopeToggle({ value, onChange }) {
   return (
     <div class="toggle" role="group" aria-label="Chart scope">
       <button
-        class="button--toggle"
+        class="button button--toggle"
         type="button"
         aria-pressed={value === 'battalion'}
         onClick={() => onChange('battalion')}
@@ -20,7 +20,7 @@ export function ScopeToggle({ value, onChange }) {
         Battalion
       </button>
       <button
-        class="button--toggle"
+        class="button button--toggle"
         type="button"
         aria-pressed={value === 'companies'}
         onClick={() => onChange('companies')}

@@ -17,7 +17,7 @@ export function GranularityRadio({ value, onChange }) {
       {GRANULARITIES.map((option) => (
         <button
           key={option.name}
-          class="button--toggle"
+          class="button button--toggle"
           type="button"
           role="radio"
           aria-checked={value === option.name}
