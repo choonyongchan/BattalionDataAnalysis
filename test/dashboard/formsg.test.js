@@ -7,7 +7,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { reportSickTypeCounts, toSubmissions } from '../../dashboard/src/model/formsg.js';
+import { reportSickTypeCounts, submissionTrend, toSubmissions } from '../../dashboard/src/model/formsg.js';
+import { toRecords } from '../../dashboard/src/data/records.js';
+import { STRENGTH_HEADERS } from '../../dashboard/src/data/tabs.js';
 
 /**
  * A FormSG response row, as `toSubmissions` reads it: an object keyed by header.
@@ -38,6 +40,48 @@ describe('toSubmissions', () => {
     const bare = row({});
     delete bare['Report Sick Type'];
     expect(toSubmissions([bare])[0].reportSickType).toBe('');
+  });
+});
+
+/**
+ * Builds Strength Data records from column-keyed row specs.
+ * @param {Array<!Object>} specs Partial records; unlisted headers read as ''.
+ * @returns {Array<!Object>} Normalised records.
+ */
+function strengthRows(specs) {
+  const values = [
+    STRENGTH_HEADERS.slice(),
+    ...specs.map((spec) => STRENGTH_HEADERS.map((header) => (header in spec ? spec[header] : ''))),
+  ];
+  return toRecords(values, STRENGTH_HEADERS, 'Strength Data');
+}
+
+describe('submissionTrend', () => {
+  test('companies scope counts submissions per company, zero for a company with none', () => {
+    const submissions = toSubmissions([
+      row({ 'Unit & Coy': '40 SAR / Archer', Timestamp: '2026-07-20 08:00:00' }),
+      row({ 'Unit & Coy': '40 SAR / Archer', Timestamp: '2026-07-20 09:00:00' }),
+    ]);
+    const trend = submissionTrend(submissions, [], ['2026-07-20'], { scope: 'companies' });
+    const archer = trend.series.find((s) => s.name === 'Archer');
+    const scorpion = trend.series.find((s) => s.name === 'Scorpion');
+    expect(archer.values[0]).toBe(2);
+    expect(scorpion.values[0]).toBe(0);
+  });
+
+  test('battalion scope returns a rate per 100 accountable', () => {
+    const submissions = toSubmissions([row({ Timestamp: '2026-07-20 08:00:00' })]);
+    const strength = strengthRows([
+      { date: '2026-07-20', session: 'FPS', company: 'Cougar', unit_type: 'Company', total_strength: 100, total_present: 90 },
+    ]);
+    const trend = submissionTrend(submissions, strength, ['2026-07-20'], { scope: 'battalion' });
+    expect(trend.series[0].values[0]).toBeCloseTo(1);
+  });
+
+  test('a day with no strength on record reads as zero, not a division error', () => {
+    const submissions = toSubmissions([row({ Timestamp: '2026-07-20 08:00:00' })]);
+    const trend = submissionTrend(submissions, [], ['2026-07-20'], { scope: 'battalion' });
+    expect(trend.series[0].values[0]).toBe(0);
   });
 });
 

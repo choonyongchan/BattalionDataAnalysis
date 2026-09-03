@@ -8,10 +8,13 @@
  *   listeners alive. Eight pages navigated back and forth all morning is how a dashboard
  *   that opened fast ends the day at a crawl. The cleanup here disposes unconditionally.
  * - **The stale tint.** ECharts holds colour *values*, so a theme change re-cascades the
- *   CSS and leaves the chart painted in the old palette. Reading `resolvedTheme.value`
- *   during render subscribes the calling component to the theme, and the paint effect
- *   then re-reads the tokens and re-applies. This is the bug `theme.js`'s header
- *   describes, closed here.
+ *   CSS and leaves the chart painted in the old palette unless something re-applies it.
+ *   An earlier version of this hook read `resolvedTheme.value` during render to lean on
+ *   `@preact/signals`' automatic component tracking; that fired once, on the first
+ *   toggle, and then stopped — the specific failure mode a bare `signal.value;`
+ *   expression statement is prone to once a component sits behind `ChartCard`'s
+ *   `cloneElement`. An explicit `resolvedTheme.subscribe` in an effect has no such
+ *   subtlety: it calls back on every change, for the life of the effect, full stop.
  * - **The wrong size.** The sidebar collapsing changes a chart's container without
  *   changing the window, so a window `resize` listener — what `js/charts.js` used —
  *   misses it and the chart keeps the old width. A `ResizeObserver` on the container
@@ -27,7 +30,7 @@
  * where a chart showing last week's data comes from.
  */
 
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { resolvedTheme } from '../theme/useTheme.js';
 import { init } from './echarts.js';
 import { readPalette } from './theme.js';
@@ -48,11 +51,10 @@ export function useChart(build) {
   const builder = useRef(build);
   builder.current = build;
 
-  // Read during render, not inside an effect: reading a signal in a component's render is
-  // what subscribes that component to it. The value itself is not needed — `readPalette`
-  // resolves the tokens directly — but the subscription is, because it is what re-renders
-  // the component on a theme change, which is what runs the paint effect below.
-  resolvedTheme.value;
+  // Forces a re-render on every theme change, for the life of this component — see the
+  // file header for why this replaced reading `resolvedTheme.value` during render.
+  const [, forceRepaint] = useState(0);
+  useEffect(() => resolvedTheme.subscribe(() => forceRepaint((tick) => tick + 1)), []);
 
   useEffect(() => {
     const node = container.current;

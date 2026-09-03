@@ -73,6 +73,17 @@ function nodeColor_(palette, node) {
 function option_(props, palette) {
   const { nodes, links } = props;
   const base = baseOption(palette);
+  // The rightmost column's labels have nothing to their right but the card's edge, and
+  // ECharts draws them there anyway — "Vocational" came out as "V". Flipping just that
+  // column's labels inward keeps the diagram full width instead of buying the room by
+  // shrinking it.
+  //
+  // Which nodes are in that column is a question about the links, not about `stage`:
+  // ECharts' default `nodeAlign: 'justify'` pushes every node with no outgoing link to the
+  // right edge, so "Outcome: MC" ends up beside "Status: Vocational" even though it is a
+  // stage earlier. Reading it off the links is the only way to get both.
+  const sources = new Set(links.map((link) => link.source));
+  const isTerminal = (node) => !sources.has(node.name);
 
   return {
     ...base,
@@ -104,7 +115,10 @@ function option_(props, palette) {
         data: nodes.map((node) => ({
           name: node.name,
           itemStyle: { color: nodeColor_(palette, node), borderWidth: 0 },
-          label: { color: isNeutral_(node) ? palette.inkFaint : palette.ink },
+          label: {
+            color: isNeutral_(node) ? palette.inkFaint : palette.ink,
+            position: isTerminal(node) ? 'left' : 'right',
+          },
         })),
         links: links.map((link) => ({ ...link })),
         label: {

@@ -1,23 +1,45 @@
 /**
- * Status (Att B / LD).
- *
- * Placeholder. The page lands in phase 2; the shell, the route and the heading are here
- * so the frame can be walked and reviewed before the panels exist.
+ * Status: the same shape as Report Sick and MC/MA, over the 10 normalised buckets
+ * `statusBuckets.js` folds 403 free-text reasons into. Status is present-but-restricted,
+ * never absence — `CategoryPage`'s trend reads it as a rate the same way it reads MC,
+ * which is a rate of restriction, not a rate of loss.
  */
 
+import { useMemo } from 'preact/hooks';
+import { dataset } from '../app/state.js';
+import { DUTY_CLASS } from '../model/classify.js';
+import { buildEpisodes } from '../model/episodes.js';
+import { toSubmissions } from '../model/formsg.js';
+import { soldierIndex } from '../model/soldier.js';
+import { bucketsFor } from '../model/statusBuckets.js';
+import { CategoryPage } from './shared/CategoryPage.jsx';
+
 /**
- * Renders the Status (Att B / LD) page.
+ * The Status page.
  * @returns {!preact.VNode} The page.
  */
 export function Status() {
+  const data = dataset.value;
+  const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
+  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
+
+  const statusEpisodes = useMemo(() => episodes.filter((e) => e.dutyClass === DUTY_CLASS.STATUS), [episodes]);
+  const reasonSource = useMemo(
+    () => ({ rows: statusEpisodes, dateOf: (e) => e.startDate, labelsOf: (e) => e.reasons.flatMap(bucketsFor) }),
+    [statusEpisodes]
+  );
+
   return (
-    <div class="page">
-      <header class="pagehead">
-        <div>
-          <h1 class="pagehead__title">Status (Att B / LD)</h1>
-          <p class="pagehead__sub">Being built.</p>
-        </div>
-      </header>
-    </div>
+    <CategoryPage
+      title="Status"
+      dataset={data}
+      episodes={episodes}
+      dutyClass={DUTY_CLASS.STATUS}
+      leaderboardMetric="status"
+      reasonSource={reasonSource}
+      showHeatmap
+      soldierIndex={index}
+    />
   );
 }

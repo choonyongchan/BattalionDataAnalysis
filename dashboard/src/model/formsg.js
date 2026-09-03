@@ -17,6 +17,7 @@ import { extractSymptoms, keywords } from './classify.js';
 import { normaliseName } from './identity.js';
 import { toIsoDate, toText } from './values.js';
 import { COMPANIES } from './domain.js';
+import { battalionStrength } from './metrics.js';
 
 /**
  * Finds the company named in a free-text unit answer.
@@ -91,6 +92,62 @@ export function keywordCounts(keywordLists, limit) {
     .map(([word, count]) => ({ word, count }))
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
     .slice(0, limit || 40);
+}
+
+/**
+ * The "reported sick" trend (FormSG submissions), battalion-wide or by company.
+ *
+ * A count, not a rate, in the companies scope: zero FormSG submissions in a day is a real
+ * fact about that company, unlike a parade-state gap — nobody has to file a form for the
+ * absence of one to be informative. Scorpion's whole FormSG history is zero for exactly
+ * this reason, and it is drawn as a flat line at zero rather than a gap, which is the
+ * honest picture of a channel with no adoption.
+ * @param {Array<!Object>} submissions Normalised FormSG submissions from `toSubmissions`.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records, for the
+ *     battalion-scope rate.
+ * @param {string[]} dates Dates to plot, oldest first.
+ * @param {{scope?: string, session?: string}=} options `scope` is 'battalion' (a rate per
+ *     100 accountable) or 'companies' (a raw count per company); `session` defaults to
+ *     'FPS' and is used only to look up battalion strength for the rate.
+ * @returns {{dates: string[], series: Array<{name: string, values: number[]}>}} The trend.
+ */
+export function submissionTrend(submissions, strengthRows, dates, options) {
+  const scope = (options && options.scope) || 'battalion';
+  const session = (options && options.session) || 'FPS';
+
+  const byDate = new Map();
+  submissions.forEach((submission) => {
+    const bucket = byDate.get(submission.date) || new Map();
+    bucket.set(submission.company, (bucket.get(submission.company) || 0) + 1);
+    byDate.set(submission.date, bucket);
+  });
+
+  if (scope === 'companies') {
+    return {
+      dates,
+      series: COMPANIES.map((company) => ({
+        name: company,
+        values: dates.map((date) => (byDate.get(date) || new Map()).get(company) || 0),
+      })),
+    };
+  }
+
+  return {
+    dates,
+    series: [
+      {
+        name: 'Battalion',
+        values: dates.map((date) => {
+          const total = Array.from((byDate.get(date) || new Map()).values()).reduce(
+            (sum, count) => sum + count,
+            0
+          );
+          const strength = battalionStrength(strengthRows, date, session);
+          return strength.accountable > 0 ? (total / strength.accountable) * 100 : 0;
+        }),
+      },
+    ],
+  };
 }
 
 /**

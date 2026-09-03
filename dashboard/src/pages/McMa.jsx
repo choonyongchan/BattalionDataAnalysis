@@ -1,23 +1,49 @@
 /**
- * MC and medical appointments.
- *
- * Placeholder. The page lands in phase 2; the shell, the route and the heading are here
- * so the frame can be walked and reviewed before the panels exist.
+ * MC / MA: the same shape as Report Sick, over Att C (a category match, never a text
+ * search — see `classify.js`) and MA, plus the two things unique to this page: how many
+ * long-term MC cases are running, and where soldiers are actually being seen.
  */
 
+import { useMemo } from 'preact/hooks';
+import { dataset } from '../app/state.js';
+import { DUTY_CLASS, extractSymptoms } from '../model/classify.js';
+import { buildEpisodes } from '../model/episodes.js';
+import { toSubmissions } from '../model/formsg.js';
+import { soldierIndex } from '../model/soldier.js';
+import { CategoryPage } from './shared/CategoryPage.jsx';
+
 /**
- * Renders the MC and medical appointments page.
+ * The MC/MA page.
  * @returns {!preact.VNode} The page.
  */
 export function McMa() {
+  const data = dataset.value;
+  const episodes = useMemo(() => buildEpisodes(data.personnel), [data.personnel]);
+  const submissions = useMemo(() => toSubmissions(data.formSg), [data.formSg]);
+  const index = useMemo(() => soldierIndex(data.personnel, submissions), [data.personnel, submissions]);
+
+  const mcEpisodes = useMemo(() => episodes.filter((e) => e.dutyClass === DUTY_CLASS.ATT_C), [episodes]);
+  const reasonSource = useMemo(
+    () => ({
+      rows: mcEpisodes,
+      dateOf: (e) => e.startDate,
+      labelsOf: (e) => (e.symptoms.length > 0 ? e.symptoms : extractSymptoms(e.reasons.join(' '))),
+    }),
+    [mcEpisodes]
+  );
+
   return (
-    <div class="page">
-      <header class="pagehead">
-        <div>
-          <h1 class="pagehead__title">MC and medical appointments</h1>
-          <p class="pagehead__sub">Being built.</p>
-        </div>
-      </header>
-    </div>
+    <CategoryPage
+      title="MC / MA"
+      dataset={data}
+      episodes={episodes}
+      dutyClass={DUTY_CLASS.ATT_C}
+      leaderboardMetric="days"
+      reasonSource={reasonSource}
+      showHeatmap
+      showLocations
+      showLongMc
+      soldierIndex={index}
+    />
   );
 }

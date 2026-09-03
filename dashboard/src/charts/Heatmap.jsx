@@ -25,7 +25,7 @@ import { tooltipLines } from './tooltip.js';
 import { axisOption, baseOption } from './theme.js';
 
 /** @type {number} Pixels between hatch lines on an inferred cell. */
-const HATCH_GAP = 5;
+const HATCH_GAP = 6;
 
 /** @type {string} What an inferred cell's tooltip says it is. */
 const INFERRED_NOTE = 'Platoon inferred from the 4D, not stated in the message.';
@@ -59,8 +59,8 @@ function hatch_(x, y, width, height, palette) {
       continue;
     }
     const shape = { x1, y1: y + (x1 - (x + offset)), x2, y2: y + (x2 - (x + offset)) };
-    under.push({ type: 'line', shape, style: { stroke: palette.surface, lineWidth: 3.5 } });
-    over.push({ type: 'line', shape, style: { stroke: palette.inferred, lineWidth: 2 } });
+    under.push({ type: 'line', shape, style: { stroke: palette.surface, lineWidth: 2.5 } });
+    over.push({ type: 'line', shape, style: { stroke: palette.inferred, lineWidth: 1.5 } });
   }
   return [...under, ...over];
 }
@@ -99,7 +99,7 @@ function inferredOverlay_(palette, inferred) {
           {
             type: 'rect',
             shape: { x, y, width: w, height: h, r: 2 },
-            style: { fill: 'none', stroke: palette.surface, lineWidth: 3 },
+            style: { fill: 'none', stroke: palette.surface, lineWidth: 2.5 },
           },
           {
             type: 'rect',
