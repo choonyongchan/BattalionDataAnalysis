@@ -39,7 +39,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -71,11 +71,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - name: Install dashboard dependencies
         run: bun install --frozen-lockfile
         working-directory: dashboard
@@ -83,9 +83,9 @@ jobs:
         run: bun run build
         working-directory: dashboard
       - name: Upload the built dashboard
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dashboard/dist
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
