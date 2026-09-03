@@ -1,23 +1,91 @@
 /**
- * Order of battle.
+ * ORBAT: who is on duty today, from the CDO down.
  *
- * Placeholder. The page lands in phase 2; the shell, the route and the heading are here
- * so the frame can be walked and reviewed before the panels exist.
+ * A single-date, single-company view rather than a range — the question this page
+ * answers is "who is in the chair right now", not a trend. Coverage in the real data is
+ * poor enough that the choice of company matters: Archer and Stallion file a roster most
+ * days, Hercules files only COS, Cougar files almost nothing, and Braves and Scorpion
+ * file none at all, ever. The battalion-level tree shows all six regardless, because a
+ * company that filed nothing is the finding, not a reason to hide it.
  */
 
+import { useMemo, useState } from 'preact/hooks';
+import { dataset } from '../app/state.js';
+import { Card, Coverage, EmptyState } from '../components/Card.jsx';
+import { ChartCard, Tree } from '../charts/index.js';
+import { COMPANIES } from '../model/domain.js';
+import { datesPresent } from '../model/metrics.js';
+import { orbatCoverage, orbatTree } from '../model/orbat.js';
+import { fmtDate, fmtFraction } from '../components/format.js';
+
 /**
- * Renders the Order of battle page.
+ * The ORBAT page.
  * @returns {!preact.VNode} The page.
  */
 export function Orbat() {
+  const data = dataset.value;
+  const paradeDates = useMemo(() => datesPresent(data.strength), [data.strength]);
+  const [date, setDate] = useState(paradeDates[paradeDates.length - 1] || null);
+  const [company, setCompany] = useState('ALL');
+
+  if (!date) {
+    return (
+      <div class="page">
+        <header class="pagehead">
+          <h1 class="pagehead__title">Order of battle</h1>
+        </header>
+        <EmptyState>No parade state has been read yet.</EmptyState>
+      </div>
+    );
+  }
+
+  const tree = orbatTree(data.roster, date, company === 'ALL' ? undefined : { company });
+  const coverage = orbatCoverage(data.roster, date);
+
   return (
     <div class="page">
       <header class="pagehead">
         <div>
           <h1 class="pagehead__title">Order of battle</h1>
-          <p class="pagehead__sub">Being built.</p>
+          <p class="pagehead__sub">Who is on duty, from the CDO down.</p>
         </div>
       </header>
+
+      <div class="controlrow">
+        <label class="control">
+          <span class="field__label">Date</span>
+          <select class="field" value={date} onChange={(event) => setDate(event.currentTarget.value)}>
+            {paradeDates
+              .slice()
+              .reverse()
+              .map((d) => (
+                <option key={d} value={d}>
+                  {fmtDate(d)}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label class="control">
+          <span class="field__label">Company</span>
+          <select class="field" value={company} onChange={(event) => setCompany(event.currentTarget.value)}>
+            <option value="ALL">Whole battalion</option>
+            {COMPANIES.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <Card title={company === 'ALL' ? '40 SAR' : company}>
+        <ChartCard title="">
+          <Tree tree={tree} height={company === 'ALL' ? 620 : 340} />
+        </ChartCard>
+        <Coverage>
+          {fmtFraction(coverage.filedCount, COMPANIES.length)} companies filed a roster on {fmtDate(date)}.
+        </Coverage>
+      </Card>
     </div>
   );
 }
