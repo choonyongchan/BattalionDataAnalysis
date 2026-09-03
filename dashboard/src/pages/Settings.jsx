@@ -10,7 +10,7 @@
 import { dataset } from '../app/state.js';
 import { Banner, Card, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
-import { fmtDate, fmtFraction, fmtInt } from '../components/format.js';
+import { fmtDate, fmtFraction, fmtInt } from '../format.js';
 import { SPREADSHEET_URL } from '../data/config.js';
 import { HOLIDAY_HEADERS, ROTATION_HEADERS, TABS } from '../data/tabs.js';
 import { toHolidays } from '../model/calendarMarks.js';

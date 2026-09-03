@@ -1,7 +1,7 @@
 /**
  * Everything the pages read, in one place.
  *
- * The shell owns all state; a page is a function of it. That is what keeps eight pages
+ * The shell owns all state; a page is a function of it. That is what keeps seven pages
  * from each growing their own copy of "which date range is selected" and drifting apart.
  *
  * The date pair and the single date answer different questions and are deliberately
@@ -34,9 +34,6 @@ export const dateTo = signal(null);
 /** @type {!import('@preact/signals').Signal<string>} A company name, or 'ALL'. */
 export const company = signal('ALL');
 
-/** @type {!import('@preact/signals').Signal<string>} Which preset the range currently matches. */
-export const datePreset = signal('all');
-
 /**
  * Whether the dashboard has data to draw.
  * @type {!import('@preact/signals').ReadonlySignal<boolean>}
@@ -55,5 +52,4 @@ export function reset() {
   dateFrom.value = null;
   dateTo.value = null;
   company.value = 'ALL';
-  datePreset.value = 'all';
 }

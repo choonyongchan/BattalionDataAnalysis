@@ -85,7 +85,7 @@ function countNonEmptyLines(text) {
  * @param {string} text Raw message text.
  * @returns {string} The first HEADER_LINES non-empty lines, newline-joined.
  */
-export function extractHeader(text) {
+function extractHeader(text) {
   return text
     .split(/\r?\n/)
     .filter((line) => line.trim().length > 0)

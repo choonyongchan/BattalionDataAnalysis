@@ -64,7 +64,7 @@ const CATEGORY_TO_CLASS = {
  * that often follows.
  * @type {!Object<string, string>}
  */
-export const EMPLOYABILITY = {
+const EMPLOYABILITY = {
   [DUTY_CLASS.ATT_C]: 'ABSENT',
   [DUTY_CLASS.REPORT_SICK]: 'EVENT',
   [DUTY_CLASS.STATUS]: 'RESTRICTED',
@@ -111,7 +111,7 @@ export function isRestricted(dutyClass) {
  * "gastric".
  * @type {Array<{label: string, pattern: !RegExp}>}
  */
-export const SYMPTOM_LEXICON = [
+const SYMPTOM_LEXICON = [
   { label: 'Food poisoning', pattern: /food\s*poison/i },
   { label: 'Sore throat', pattern: /sore\s*throat|throat\s*(pain|ache|infection)|hurts?\s*to\s*swallow|painful\s*swallow/i },
   { label: 'Runny nose', pattern: /runny\s*nose|running\s*nose|rhinorrh?ea/i },

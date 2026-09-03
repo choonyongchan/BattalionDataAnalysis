@@ -16,7 +16,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { baseOption, seriesColor } from './theme.js';
 
@@ -95,10 +95,10 @@ function option_(props, palette) {
         params.dataType === 'edge'
           ? tooltipLines(
               shortName_(params.data.source) + ' → ' + shortName_(params.data.target),
-              [fmtCount(params.data.value) + ' events'],
+              [fmtInt(params.data.value) + ' events'],
               palette
             )
-          : tooltipLines(shortName_(params.name), [fmtCount(params.value) + ' events'], palette),
+          : tooltipLines(shortName_(params.name), [fmtInt(params.value) + ' events'], palette),
     },
     series: [
       {
@@ -155,7 +155,7 @@ export function Sankey(props) {
         rows={links
           .slice()
           .sort((a, b) => b.value - a.value)
-          .map((link) => [shortName_(link.source), shortName_(link.target), fmtCount(link.value)])}
+          .map((link) => [shortName_(link.source), shortName_(link.target), fmtInt(link.value)])}
         caption="Report-sick flow, one row per link"
       />
     );

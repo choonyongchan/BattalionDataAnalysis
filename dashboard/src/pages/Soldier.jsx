@@ -13,7 +13,7 @@ import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
 import { SoldierSearch } from '../components/SoldierSearch.jsx';
-import { fmtDate, fmtInt } from '../components/format.js';
+import { fmtDate, fmtInt } from '../format.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { toSubmissions } from '../model/formsg.js';
 import { soldierIndex, soldierReport } from '../model/soldier.js';

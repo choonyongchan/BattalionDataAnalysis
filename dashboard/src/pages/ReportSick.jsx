@@ -12,7 +12,7 @@ import { dataset } from '../app/state.js';
 import { Card, Coverage } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
 import { Tile } from '../components/Tile.jsx';
-import { fmtInt } from '../components/format.js';
+import { fmtInt } from '../format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import { buildEpisodes } from '../model/episodes.js';
 import { submissionRateByCompany, submissionTrend, toSubmissions, topSubmitters } from '../model/formsg.js';

@@ -4,8 +4,8 @@
  * A raster asset, not `currentColor` — a crest carries its own heraldic colours (gold,
  * red, the fist-and-rifles device) that would be lost if flattened to one theme-ink
  * colour, unlike the previous inline-SVG placeholder. The source file
- * (`40SARlogo.webp`, repo root) ships on a solid black square; `scripts/make-logo.py`
- * flood-fills that to transparency and crops to the crest's bounding box, so the same
+ * (`40SARlogo.webp`, repo root) shipped on a solid black square; it was flood-filled
+ * to transparency and cropped to the crest's bounding box, so the same
  * asset sits cleanly on both the light and dark sidebar background.
  */
 

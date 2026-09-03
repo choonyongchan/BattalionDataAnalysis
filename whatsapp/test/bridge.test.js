@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { loadConfig } from '../src/config.js';
-import { buildIntakePayload, buildIntakeUrl, relayParadeState } from '../src/appsScriptClient.js';
+import { buildIntakeUrl, relayParadeState } from '../src/appsScriptClient.js';
 import { extractText, isWatchedGroupMessage } from '../src/listener.js';
 import { createMessageHandler } from '../src/index.js';
 
@@ -82,13 +82,6 @@ describe('appsScriptClient helpers', () => {
     expect(buildIntakeUrl(`${EXEC_URL}?v=2`)).toBe(`${EXEC_URL}?v=2&route=paradestate`);
   });
 
-  test('builds the payload the handler expects', () => {
-    expect(buildIntakePayload('PARADE STATE', 'MSG1', 'tok')).toEqual({
-      token: 'tok',
-      messageId: 'MSG1',
-      text: 'PARADE STATE',
-    });
-  });
 });
 
 describe('relayParadeState', () => {

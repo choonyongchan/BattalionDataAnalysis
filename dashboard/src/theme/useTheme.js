@@ -15,7 +15,7 @@ import { signal, computed, effect } from '@preact/signals';
 const STORAGE_KEY = 'dashboard-theme';
 
 /** @type {string[]} The three settings a viewer can hold. */
-export const THEME_CHOICES = ['system', 'light', 'dark'];
+const THEME_CHOICES = ['system', 'light', 'dark'];
 
 /**
  * Reads the stored preference.

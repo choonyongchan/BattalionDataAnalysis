@@ -16,7 +16,7 @@
  * worth naming.
  */
 
-import { use, init, registerTheme, graphic } from 'echarts/core';
+import { use, init, graphic } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
 import {
   BarChart,
@@ -62,4 +62,4 @@ use([
   VisualMapComponent, // the Heatmap's sequential ramp
 ]);
 
-export { init, registerTheme, graphic };
+export { init, graphic };

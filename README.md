@@ -177,13 +177,14 @@ installable triggers do not run in response to API requests.
   GitHub Pages that reads **Strength Data**, **Personnel Data**, **Command Roster**
   and the FormSG tab. It reads them through `?route=dashboard` on this project's own
   web app, behind one shared password in the `DASHBOARD_PASSWORD` script property —
-  so the spreadsheet stays private and nothing is published. Five views: **Today** (the
-  parade snapshot), then **MC**, **Report sick** and **Status** — each asking the same
-  four questions, trend to company to platoon to who-most-often — then **Soldier**. It
-  covers what Looker Studio cannot: rates per 100 pax-days by platoon, daily snapshots
-  collapsed into episodes, and per-soldier history. See
+  so the spreadsheet stays private and nothing is published. Seven pages:
+  **Overview** (the parade snapshot and the battalion's trend), then **Report sick**,
+  **MC / MA** and **Status** — each asking the same four questions, trend to company to
+  platoon to who-most-often — then **Soldier** (one person's whole record), **ORBAT**
+  (who is on duty today) and **Settings** (what is being read, and how much of the
+  battalion it covers). It derives what the sheets do not carry: rates per 100 pax-days
+  by platoon, daily snapshots collapsed into episodes, and per-soldier history. See
   [`dashboard/README.md`](dashboard/README.md) for the two-step setup.
-  Looker Studio can still be pointed at the same sheets alongside it.
 - **To rotate the dashboard password**: edit `DASHBOARD_PASSWORD` under **Project
   Settings → Script Properties**. No code change, no redeploy.
 
@@ -194,7 +195,7 @@ installable triggers do not run in response to API requests.
 | A Form submission never gets processed | The `onFormSubmitHandler` trigger isn't installed | Check the Triggers panel (clock icon); re-run `installTriggers` |
 | A WhatsApp relay returns `unknown_route` | `APPS_SCRIPT_URL` already carries a query string, or is not the `/exec` URL | The bridge appends `?route=paradestate` itself — `APPS_SCRIPT_URL` must have no query string |
 | The dashboard says the password is not right, and it is | The `DASHBOARD_PASSWORD` script property is unset or disagrees, or the web app was never redeployed after the route was added | Set the property under **Project Settings → Script Properties**; redeploy the web app (`clasp push` alone does not publish a new route). Fails closed by design |
-| The dashboard says the feed replied with something other than data | `FEED_URL` is missing `?route=dashboard`, or points at a deployment that no longer exists | Check `FEED_URL` in `dashboard/js/config.js` against **Deploy → Manage deployments** |
+| The dashboard says the feed replied with something other than data | `FEED_URL` is missing `?route=dashboard`, or points at a deployment that no longer exists | Check `FEED_URL` in `dashboard/src/data/config.js` against **Deploy → Manage deployments** |
 | The dashboard is locked out | Ten wrong passwords inside fifteen minutes | Wait fifteen minutes. If nobody was mistyping, treat it as someone guessing and rotate the password |
 | A WhatsApp relay returns `unauthorised` | `APPS_SCRIPT_TOKEN` and the `WHATSAPP_INGEST_TOKEN` script property disagree, or the property was never set | Set the property under **Project Settings → Script Properties**, then match it in `whatsapp/.env`. The endpoint fails closed by design |
 | Report-sick rows suddenly stopped arriving | Plumber's URL is missing `?route=reportsick`, **or** its body is missing the `token` field, **or** the `FORMSG_INGEST_TOKEN` script property is unset or disagrees | Apps Script always answers 200, so Plumber records these as successes — check **Executions** for the logged `unknown_route` / `unauthorised`. Add the route parameter (§8.2), add `"token"` to the body (§8.3), and set the property to match. Fails closed by design |
@@ -342,8 +343,8 @@ FormSG's CSV export stays the authoritative record. To refresh from it:
 
 Step 2 is not optional. Depending on how the paste lands, Google Sheets either
 parses FormSG's `07 May 2026 19:21:00` timestamps into real dates or leaves them as
-plain text — and a column that is half one and half the other will not sort, and
-Looker Studio will not read it as a date. The macro converts any text timestamps it
+plain text — and a column that is half one and half the other will not sort, and is
+not read as a date by anything downstream. The macro converts any text timestamps it
 finds, leaves real dates alone, and reports anything it could not parse. It is safe
 to run at any time and safe to run twice.
 
@@ -370,7 +371,7 @@ Between imports the webhook simply appends new rows in the same format.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Plumber reports the webhook step failed, but the row appears anyway | Apps Script answers POSTs with a 302 redirect, which some clients count as a failure even though the script already ran | Harmless — dedup prevents duplicate rows |
-| The `Timestamp` column won't sort, or Looker Studio treats it as text | A CSV import pasted timestamps as text | Run `formSgNormaliseTimestamps` (§8.5) |
+| The `Timestamp` column won't sort, or is treated as text | A CSV import pasted timestamps as text | Run `formSgNormaliseTimestamps` (§8.5) |
 | One column is blank on every new row | That header has no matching line in the Plumber body | Add it in §8.3 — the sheet header and the Plumber key must match character for character |
 | Every submission fails, and Executions shows `bad_request` | A free-text answer contained a quote or newline that broke Plumber's JSON body | Switch the Plumber action to a form-encoded body, or have it escape the field |
 | `SingPass Validated NRIC` is blank | The form has no Singpass verification, or `NRIC/FIN (Verified)` is unmapped in Plumber | Check the Plumber trigger's sample data actually contains that variable |

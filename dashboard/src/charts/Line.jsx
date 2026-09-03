@@ -2,8 +2,8 @@
  * A trend over parade days, one line per company.
  *
  * The one thing this chart does differently from the implementation it replaces:
- * **`connectNulls` is false.** `js/charts.js` set it true and defended the choice in a
- * comment — a gapped line "reads as the rate having dropped to nothing". That defence is
+ * **`connectNulls` is false.** The previous implementation set it true and defended the
+ * choice in a comment — a gapped line "reads as the rate having dropped to nothing". That defence is
  * wrong in this dataset. Only five of forty-five parade days carry all six companies, so
  * the holes are not rare accidents to be smoothed over; they are most of the picture. A
  * line drawn straight across a day nobody filed asserts a reading that was never taken,
@@ -20,7 +20,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import { axisOption, baseOption, legendOption, seriesColor, valueAxisOption } from './theme.js';
 
@@ -138,7 +138,7 @@ function option_(props, palette) {
           points.length ? points[0].axisValue : null,
           points.map((point) => ({
             label: point.seriesName,
-            value: point.value === null || point.value === undefined ? 'no filing' : fmtCount(point.value),
+            value: point.value === null || point.value === undefined ? 'no filing' : fmtInt(point.value),
             color: point.color,
             muted: point.value === null || point.value === undefined,
           })),
@@ -149,7 +149,7 @@ function option_(props, palette) {
     // `boundaryGap: false` puts the first and last points hard against the plot edges, and
     // their labels are centred on them — so half of each hangs outside the SVG. Anchoring
     // the two end labels inward is what keeps the date range readable, and is carried
-    // forward from `js/charts.js`.
+    // forward from the previous implementation.
     xAxis: axisOption(palette, {
       type: 'category',
       data: categories,
@@ -221,7 +221,7 @@ export function Line(props) {
         ]}
         rows={categories.map((category, index) => [
           category,
-          ...series.map((entry) => fmtCount(entry.values[index])),
+          ...series.map((entry) => fmtInt(entry.values[index])),
         ])}
         caption={valueName ? valueName + ' by day' : 'Values by day'}
       />

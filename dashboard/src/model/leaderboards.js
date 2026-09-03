@@ -13,7 +13,6 @@
  * Every function here is pure.
  */
 
-import { PLATOONS } from './domain.js';
 import { platoonOf } from './platoon.js';
 import { isPermanentStatus } from './statusBuckets.js';
 import { companyRates, leaderboard, unitRates } from './metrics.js';
@@ -167,6 +166,3 @@ export function rankUnits(personnelRows, strengthRows, dutyClass, level) {
   }
   return companyRates(personnelRows, strengthRows, dutyClass);
 }
-
-/** @type {string[]} Re-exported so a page can label an "Unassigned" platoon consistently. */
-export const PLATOON_ROLL = PLATOONS;

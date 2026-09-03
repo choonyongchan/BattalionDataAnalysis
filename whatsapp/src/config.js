@@ -4,30 +4,22 @@
  * Every secret and deployment-specific value lives in whatsapp/.env, mirroring
  * the convention the FormSG module uses for its own credentials. Nothing here
  * is ever hard-coded into source.
+ *
+ * Bun reads .env out of the working directory on start-up, so there is no
+ * dotenv call here. That does mean the bridge must be started from whatsapp/,
+ * which is what `bun start` and the startup shortcut both do — see README.md.
+ * Started from anywhere else, the required variables read as missing and
+ * `loadConfig` says so by name rather than failing later and vaguely.
  */
 
-import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
 
 /** @type {string} Absolute path to the whatsapp/ module root. */
 export const MODULE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** @type {string} Directory holding the persisted Baileys auth session. */
 export const AUTH_DIR = join(MODULE_ROOT, 'auth');
-
-/**
- * Loads whatsapp/.env into process.env if it has not been loaded already.
- *
- * @returns {void}
- */
-function loadDotEnv() {
-  const envPath = join(MODULE_ROOT, '.env');
-  if (existsSync(envPath)) {
-    dotenv.config({ path: envPath, quiet: true });
-  }
-}
 
 /**
  * Reads a required environment variable.
@@ -64,21 +56,18 @@ function optionalEnv(env, key, fallback) {
  * Loading fails fast at start-up rather than at the moment the first parade
  * state arrives.
  *
- * `env` is injectable because .env is loaded into `process.env` as a side
- * effect, which a test cannot undo — without it, a populated .env on the
- * developer's machine silently overrides whatever the test set.
+ * `env` is injectable because Bun has already merged .env into `process.env`
+ * before this module runs, which a test cannot undo — without it, a populated
+ * .env on the developer's machine silently overrides whatever the test set.
  *
  * @param {{env?: !Object<string, string>}} [options] `env` defaults to
- *   process.env after whatsapp/.env has been loaded into it.
+ *   process.env, which already carries whatsapp/.env.
  * @returns {{groupId: string, appsScriptUrl: string, appsScriptToken: string,
  *   logLevel: string, dryRun: boolean, authDir: string}} The resolved
  *   configuration.
  * @throws {Error} If a required variable is missing.
  */
 export function loadConfig(options = {}) {
-  if (options.env === undefined) {
-    loadDotEnv();
-  }
   const env = options.env || process.env;
 
   return {

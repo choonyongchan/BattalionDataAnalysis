@@ -71,7 +71,7 @@ const OPTIONAL_TAB_SPECS = [
  * Whether a feed URL has been configured.
  * @returns {boolean} True when `config.js` names an endpoint.
  */
-export function isConfigured() {
+function isConfigured() {
   return FEED_URL !== '';
 }
 

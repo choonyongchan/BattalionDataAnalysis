@@ -13,9 +13,9 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { dataset, dateFrom, dateTo, selectedDate } from '../app/state.js';
 import { Card, Coverage, EmptyState } from '../components/Card.jsx';
 import { Tile, TileRow } from '../components/Tile.jsx';
-import { ScopeToggle } from '../components/ScopeToggle.jsx';
+import { Segmented, SCOPE_OPTIONS } from '../components/Segmented.jsx';
 import { DateRangePicker, PresetBar } from '../components/DateRangePicker.jsx';
-import { fmtDate, fmtFraction, fmtInt, fmtShare } from '../components/format.js';
+import { fmtDate, fmtFraction, fmtInt, fmtPercent } from '../format.js';
 import { ChartCard, Line, Sankey, Timeline } from '../charts/index.js';
 import { COMPANIES } from '../model/domain.js';
 import { DUTY_CLASS } from '../model/classify.js';
@@ -80,7 +80,7 @@ function TrendCard({ title, trendFn, coverage, unit }) {
   return (
     <Card title={title}>
       <div class="controlrow">
-        <ScopeToggle value={scope} onChange={setScope} />
+        <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
       </div>
       <ChartCard title="" coverage={coverage}>
         <Line
@@ -182,7 +182,7 @@ export function Overview() {
       <TileRow>
         <Tile label="Total soldiers" value={fmtInt(strength.accountable)} />
         <Tile label="Present soldiers" value={fmtInt(strength.present)} />
-        <Tile label="% present" value={fmtShare(strength.percentPresent / 100)} />
+        <Tile label="% present" value={fmtPercent(strength.percentPresent / 100)} />
         <Tile label="Reporting sick" value={fmtInt(countOf(duty, DUTY_CLASS.REPORT_SICK))} foot="Parade state" />
         <Tile label="Reported sick" value={fmtInt(reportedSickToday)} foot="FormSG" />
         <Tile

@@ -5,7 +5,7 @@
  * exists to make each of them impossible rather than remembered:
  *
  * - **The leak.** An instance not disposed on unmount keeps its DOM, its data and its
- *   listeners alive. Eight pages navigated back and forth all morning is how a dashboard
+ *   listeners alive. Seven pages navigated back and forth all morning is how a dashboard
  *   that opened fast ends the day at a crawl. The cleanup here disposes unconditionally.
  * - **The stale tint.** ECharts holds colour *values*, so a theme change re-cascades the
  *   CSS and leaves the chart painted in the old palette unless something re-applies it.
@@ -16,13 +16,13 @@
  *   `cloneElement`. An explicit `resolvedTheme.subscribe` in an effect has no such
  *   subtlety: it calls back on every change, for the life of the effect, full stop.
  * - **The wrong size.** The sidebar collapsing changes a chart's container without
- *   changing the window, so a window `resize` listener — what `js/charts.js` used —
- *   misses it and the chart keeps the old width. A `ResizeObserver` on the container
+ *   changing the window, so a window `resize` listener — what the old implementation
+ *   used — misses it and the chart keeps the old width. A `ResizeObserver` on the container
  *   itself sees every case, including the one the old code got wrong.
  * - **The clipped axis label.** ECharts reserves the axis gutter by measuring labels at
  *   `setOption` time. Measured against a fallback font, the real face overflows the space
  *   reserved for it and long category labels lose their first characters. Carried forward
- *   from `js/charts.js`: re-lay out once the fonts land.
+ *   from the previous implementation: re-lay out once the fonts land.
  *
  * The option is rebuilt on every render rather than behind a dependency array. A chart
  * only re-renders when its props or the theme changed, so the dependency array would be a

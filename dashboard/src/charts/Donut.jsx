@@ -16,7 +16,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount, fmtShare } from './format.js';
+import { fmtInt, fmtShareOf } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { baseOption, legendOption, seriesColor } from './theme.js';
 
@@ -43,7 +43,7 @@ function total_(slices) {
  *
  * Anchored to the ring's own centre rather than to the canvas: when the legend moves to the
  * right the ring slides left with it, and a canvas-centred total would sit off the hole and
- * over the slices. Carried forward from `js/charts.js`.
+ * over the slices. Carried forward from the previous implementation.
  * @param {!Object} palette A palette from `readPalette`.
  * @param {string} label What the total counts.
  * @param {number} total The total.
@@ -60,7 +60,7 @@ function centreLabel_(palette, label, total, centre) {
       top: y - 7 + '%',
       silent: true,
       style: {
-        text: fmtCount(total),
+        text: fmtInt(total),
         fill: palette.ink,
         // Proportional figures, not tabular: at 26px a tabular '121' looks loose.
         font: '600 26px ' + palette.fontDisplay,
@@ -103,7 +103,7 @@ function option_(props, palette, width) {
       formatter: (params) =>
         tooltipLines(
           params.name,
-          [fmtCount(params.value) + ' of ' + fmtCount(total), fmtShare(params.value, total)],
+          [fmtInt(params.value) + ' of ' + fmtInt(total), fmtShareOf(params.value, total)],
           palette
         ),
     },
@@ -130,7 +130,7 @@ function option_(props, palette, width) {
           // it to an ellipsis that says less than nothing. Below that width each slice
           // carries its value only and the legend underneath carries the names.
           formatter: (params) =>
-            width < NARROW_CARD ? fmtCount(params.value) : params.name + '\n' + fmtCount(params.value),
+            width < NARROW_CARD ? fmtInt(params.value) : params.name + '\n' + fmtInt(params.value),
         },
         labelLine: { lineStyle: { color: palette.hairline }, length: 8, length2: 8 },
         data: slices.map((slice, index) => {
@@ -177,8 +177,8 @@ export function Donut(props) {
       <TableTwin
         columns={[{ label: 'Part' }, { label: 'Count', numeric: true }, { label: 'Share', numeric: true }]}
         rows={[
-          ...slices.map((slice) => [slice.name, fmtCount(slice.value), fmtShare(slice.value, total)]),
-          [centreLabel || 'Total', fmtCount(total), '100.0%'],
+          ...slices.map((slice) => [slice.name, fmtInt(slice.value), fmtShareOf(slice.value, total)]),
+          [centreLabel || 'Total', fmtInt(total), '100.0%'],
         ]}
         caption={'Composition of ' + (centreLabel || 'the total')}
       />

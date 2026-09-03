@@ -12,7 +12,7 @@ class FormSgTimestamps {
    * FormSG's CSV export writes timestamps as "07 May 2026 19:21:00". Whether Google
    * Sheets parses that into a Date or leaves it as text depends on how the export was
    * pasted, which is why the column arrives half one and half the other. Real Dates
-   * are canonical: they sort chronologically and Looker Studio reads them as dates.
+   * are canonical: they sort chronologically and read back as dates downstream.
    *
    * Re-runnable, and meant to be re-run: every fresh CSV import reintroduces text
    * timestamps. Cells that are already Dates are left untouched, and anything matching

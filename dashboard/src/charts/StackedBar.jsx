@@ -14,7 +14,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import {
   axisOption,
@@ -61,7 +61,7 @@ function option_(props, palette) {
             .filter((point) => point.value > 0)
             .map((point) => ({
               label: point.seriesName,
-              value: fmtCount(point.value),
+              value: fmtInt(point.value),
               color: point.color,
             })),
           palette
@@ -115,8 +115,8 @@ export function StackedBar(props) {
         ]}
         rows={categories.map((category, index) => [
           category,
-          ...series.map((entry) => fmtCount(entry.values[index])),
-          fmtCount(
+          ...series.map((entry) => fmtInt(entry.values[index])),
+          fmtInt(
             series.reduce(
               (sum, entry) => sum + (Number.isFinite(entry.values[index]) ? entry.values[index] : 0),
               0

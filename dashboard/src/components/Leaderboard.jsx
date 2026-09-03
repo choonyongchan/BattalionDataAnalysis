@@ -3,7 +3,7 @@
  */
 
 import { DataTable } from './Table.jsx';
-import { fmtInt, fmtDecimal } from './format.js';
+import { fmtInt, fmtDecimal } from '../format.js';
 
 /**
  * Marks a platoon cell as inferred, in the same hatch the heatmap uses for the same fact.

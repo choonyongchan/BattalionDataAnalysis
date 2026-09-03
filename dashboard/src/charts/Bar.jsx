@@ -15,7 +15,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import {
   axisOption,
@@ -52,7 +52,7 @@ function option_(props, palette) {
       formatter: (params) =>
         tooltipNode(
           params[0].name,
-          [{ label: valueName || 'Value', value: fmtCount(params[0].value), color: params[0].color }],
+          [{ label: valueName || 'Value', value: fmtInt(params[0].value), color: params[0].color }],
           palette
         ),
     },
@@ -68,7 +68,7 @@ function option_(props, palette) {
           // Set per item rather than only on the series: a data-level `itemStyle` replaces
           // the series-level one outright, so a radius declared only on the series would be
           // dropped here and the bar ends would square off. Found the hard way in
-          // `js/charts.js`.
+          // the previous implementation.
           itemStyle: {
             color:
               standingColor(palette, standingOf ? standingOf(index) : null) ||
@@ -123,7 +123,7 @@ export function Bar(props) {
     return (
       <TableTwin
         columns={[{ label: 'Category' }, { label: valueName || 'Value', numeric: true }]}
-        rows={categories.map((category, index) => [category, fmtCount(values[index])])}
+        rows={categories.map((category, index) => [category, fmtInt(values[index])])}
         caption={valueName ? valueName + ' by category' : 'Values by category'}
       />
     );

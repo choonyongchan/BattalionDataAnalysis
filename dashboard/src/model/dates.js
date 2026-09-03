@@ -18,7 +18,13 @@ export const MS_PER_DAY = 86400000;
 export const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);
 
 /** @type {string[]} Short weekday names, Monday first. */
-export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** @type {string[]} Short month names, January first. */
+export const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
 
 /**
  * Renders a UTC millisecond timestamp as an ISO 'yyyy-MM-dd' date string.

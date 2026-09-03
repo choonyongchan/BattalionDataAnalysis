@@ -113,8 +113,7 @@ select {
 }
 
 /* The system-wide press state, per DESIGN.md. */
-button:active:not(:disabled),
-.pressable:active {
+button:active:not(:disabled) {
   transform: scale(0.95);
 }
 
@@ -181,8 +180,7 @@ button {
     scroll-behavior: auto !important;
   }
 
-  button:active:not(:disabled),
-  .pressable:active {
+  button:active:not(:disabled) {
     transform: none;
   }
 }

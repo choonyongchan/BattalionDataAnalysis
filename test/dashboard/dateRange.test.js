@@ -14,7 +14,6 @@ import {
   eachDay,
   firstOfMonth,
   matchPreset,
-  mondayFirstIndex,
   overlapsRange,
   resolvePreset,
   withinRange,
@@ -101,20 +100,8 @@ describe('eachDay', () => {
 });
 
 describe('resolvePreset', () => {
-  test('last7 spans seven inclusive days ending today', () => {
-    expect(resolvePreset('last7', '2026-06-22')).toEqual({ from: '2026-06-16', to: '2026-06-22' });
-  });
-
-  test('last14 spans fourteen inclusive days ending today', () => {
-    expect(resolvePreset('last14', '2026-06-22')).toEqual({ from: '2026-06-09', to: '2026-06-22' });
-  });
-
-  test('last7 counts back across a month boundary', () => {
-    expect(resolvePreset('last7', '2026-07-03')).toEqual({ from: '2026-06-27', to: '2026-07-03' });
-  });
-
-  test('month runs from the first of the current month', () => {
-    expect(resolvePreset('month', '2026-06-22')).toEqual({ from: '2026-06-01', to: '2026-06-22' });
+  test('thisMonth runs from the first of the current month to today', () => {
+    expect(resolvePreset('thisMonth', '2026-06-22')).toEqual({ from: '2026-06-01', to: '2026-06-22' });
   });
 
   test('all clears both bounds', () => {
@@ -142,10 +129,6 @@ describe('resolvePreset', () => {
 
   test('thisMonth on the 1st is a single day, not the whole month', () => {
     expect(resolvePreset('thisMonth', '2026-06-01')).toEqual({ from: '2026-06-01', to: '2026-06-01' });
-  });
-
-  test('thisMonth is an alias-compatible rename of the existing month preset', () => {
-    expect(resolvePreset('thisMonth', '2026-06-22')).toEqual(resolvePreset('month', '2026-06-22'));
   });
 
   test('lastMonth spans January across a year boundary', () => {
@@ -197,11 +180,6 @@ describe('month-grid arithmetic', () => {
     expect(daysOfMonth('2026-06-01')[0]).toBe('2026-06-01');
     expect(daysOfMonth('2026-06-01')[29]).toBe('2026-06-30');
   });
-
-  test('mondayFirstIndex puts Monday at 0 and Sunday at 6', () => {
-    expect(mondayFirstIndex('2026-06-22')).toBe(0); // a Monday
-    expect(mondayFirstIndex('2026-06-28')).toBe(6); // the Sunday after
-  });
 });
 
 describe('matchPreset', () => {
@@ -209,10 +187,7 @@ describe('matchPreset', () => {
     expect(matchPreset(null, null, '2026-06-22')).toBe('all');
   });
 
-  // A range shaped like the legacy 'month' preset must light up the 'thisMonth' button —
-  // the two produce an identical range, and 'thisMonth' is the name PRESETS (and so the
-  // UI) actually uses. Returning 'month' here would mean no button ever lights up.
-  test('a this-month-shaped range matches thisMonth, not the legacy month name', () => {
+  test('recognises a thisMonth-shaped range', () => {
     expect(matchPreset('2026-06-01', '2026-06-22', '2026-06-22')).toBe('thisMonth');
   });
 
@@ -226,10 +201,6 @@ describe('matchPreset', () => {
 
   test('recognises a lastMonth-shaped range', () => {
     expect(matchPreset('2026-05-01', '2026-05-31', '2026-06-24')).toBe('lastMonth');
-  });
-
-  test('still recognises a last7-shaped range that no button represents', () => {
-    expect(matchPreset('2026-06-16', '2026-06-22', '2026-06-22')).toBe('last7');
   });
 
   test('returns null for a hand-picked span that matches no preset', () => {

@@ -30,23 +30,9 @@ export function unlock(typed) {
     loadError.value = 'Enter the password.';
     return Promise.resolve(false);
   }
-
   password = typed;
-  status.value = 'loading';
   loadError.value = '';
-
-  return loadAll(password)
-    .then((data) => {
-      dataset.value = data;
-      status.value = 'ready';
-      return true;
-    })
-    .catch((error) => {
-      password = '';
-      loadError.value = error.message;
-      status.value = 'locked';
-      return false;
-    });
+  return load_('locked', true);
 }
 
 /**
@@ -54,9 +40,22 @@ export function unlock(typed) {
  * @returns {!Promise<boolean>} True once fresh data is loaded.
  */
 export function refresh() {
-  if (password === '') {
-    return Promise.resolve(false);
-  }
+  return password === '' ? Promise.resolve(false) : load_('error', false);
+}
+
+/**
+ * Loads the dataset with the held password and moves the store to its next state.
+ *
+ * The two callers differ only in what a failure means. A wrong password on the login
+ * screen is 'locked' — the viewer is where they started, and the password is discarded so
+ * it is not left in memory to be retried by something else. A failure while already
+ * unlocked is 'error': the password was right, the network or the feed was not, and
+ * throwing the viewer back to the login screen would lose the data they still have.
+ * @param {string} failStatus Status to fall to when the load fails.
+ * @param {boolean} forgetOnFail Whether a failure discards the held password.
+ * @returns {!Promise<boolean>} True once data is loaded.
+ */
+function load_(failStatus, forgetOnFail) {
   status.value = 'loading';
   return loadAll(password)
     .then((data) => {
@@ -65,8 +64,11 @@ export function refresh() {
       return true;
     })
     .catch((error) => {
+      if (forgetOnFail) {
+        password = '';
+      }
       loadError.value = error.message;
-      status.value = 'error';
+      status.value = failStatus;
       return false;
     });
 }

@@ -34,7 +34,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtClock } from './format.js';
+import { fmtClock } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { axisOption, baseOption, seriesColor } from './theme.js';
 

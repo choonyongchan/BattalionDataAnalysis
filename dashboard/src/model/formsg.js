@@ -75,26 +75,6 @@ export function toSubmissions(rows) {
 }
 
 /**
- * Counts keyword frequency across free-text reasons.
- *
- * Built from the soldiers' own words rather than the symptom lexicon, because the cloud's
- * job is to surface phrasing the lexicon has not learned yet.
- * @param {Array<string[]>} keywordLists Per-submission keyword lists.
- * @param {number=} limit Most words to return; defaults to 40.
- * @returns {Array<{word: string, count: number}>} Words, most frequent first.
- */
-export function keywordCounts(keywordLists, limit) {
-  const counts = new Map();
-  keywordLists.forEach((list) => {
-    list.forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
-  });
-  return Array.from(counts.entries())
-    .map(([word, count]) => ({ word, count }))
-    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
-    .slice(0, limit || 40);
-}
-
-/**
  * The "reported sick" trend (FormSG submissions), battalion-wide or by company.
  *
  * A count, not a rate, in the companies scope: zero FormSG submissions in a day is a real

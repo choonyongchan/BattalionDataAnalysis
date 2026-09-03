@@ -9,7 +9,7 @@
  * holding a value it copied down once, silently does not.
  *
  * Hence `readPalette()` is a function and not a constant. The previous implementation
- * cached the palette at module load (`const COLOR = readPalette_()` in `js/charts.js`),
+ * cached the palette at module load (`const COLOR = readPalette_()`),
  * which was correct only because that dashboard had a single theme. Here the palette is
  * re-read on every paint, and `useChart.js` re-paints whenever `resolvedTheme` changes.
  *
@@ -173,8 +173,8 @@ export function axisOption(palette, extra) {
  * ECharts centres an axis name on the axis line, which puts about half of it outside the
  * SVG: a vertical axis's name overhangs the left edge, a horizontal one's overhangs the
  * right, and the browser clips both. Aligning the text toward the inside of the plot is
- * what keeps it whole. Carried forward from `js/charts.js`, where it was found the hard
- * way.
+ * what keeps it whole. Carried forward from the previous implementation, where it was
+ * found the hard way.
  * @param {!Object} palette A palette from `readPalette`.
  * @param {string=} name The unit shown at the end of the axis.
  * @param {boolean=} vertical Whether the axis runs up the page.

@@ -162,7 +162,7 @@ class FormSgSheet {
    * Converts the submission time into a Date cell value.
    *
    * Written as a real Date rather than a formatted string so the column sorts
-   * chronologically and Looker Studio reads it as a date. An unparseable value falls
+   * chronologically and reads back as a date downstream. An unparseable value falls
    * back to the raw string rather than writing an Invalid Date.
    *
    * @param {*} submittedAt Plumber's `Submission Time`, an offset-aware ISO string.

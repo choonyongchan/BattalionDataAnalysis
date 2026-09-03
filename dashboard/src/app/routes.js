@@ -1,5 +1,5 @@
 /**
- * The eight pages, in the order a commander reads them.
+ * The seven pages, in the order a commander reads them.
  *
  * One list, used three times: the sidebar renders it, the router matches it, and the page
  * head takes its title from it. Adding a page means adding a row here and nothing else.

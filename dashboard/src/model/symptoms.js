@@ -109,36 +109,6 @@ export function clinicalCounts(submissions) {
 }
 
 /**
- * Counts clinical buckets per time bucket, for a trend chart.
- * @param {Array<!Object>} submissions Normalised submissions.
- * @param {Array<{key: string, label: string, dates: string[]}>} groups Time buckets.
- * @returns {Array<{bucket: string, label: string, values: number[]}>} One series per
- *     clinical bucket that appears at all, aligned to `groups`.
- */
-export function clinicalTrend(submissions, groups) {
-  const dateToIndex = new Map();
-  groups.forEach((group, index) => {
-    group.dates.forEach((date) => dateToIndex.set(date, index));
-  });
-
-  const series = new Map();
-  (submissions || []).forEach((submission) => {
-    const index = dateToIndex.get(submission.date);
-    if (index === undefined) {
-      return;
-    }
-    const bucket = clinicalBucketOf(submission.symptomAnswer);
-    const values = series.get(bucket) || new Array(groups.length).fill(0);
-    values[index] += 1;
-    series.set(bucket, values);
-  });
-
-  return Array.from(series.entries())
-    .map(([bucket, values]) => ({ bucket, label: shortLabel(bucket), values }))
-    .sort((a, b) => ALL_BUCKETS.indexOf(a.bucket) - ALL_BUCKETS.indexOf(b.bucket));
-}
-
-/**
  * Word frequencies across the free-text reason field, for the word cloud.
  *
  * Reads `reason` alone, not the joined `text`: the pick-list's own wording would otherwise

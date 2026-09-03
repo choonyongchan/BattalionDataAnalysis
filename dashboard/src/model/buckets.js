@@ -12,15 +12,8 @@
  * Every function here is pure.
  */
 
-import { addDays, weekdayOf } from './dates.js';
-import { mondayFirstIndex } from './dateRange.js';
+import { addDays, MONTH_NAMES, weekdayOf } from './dates.js';
 import { rotationOf } from './rotations.js';
-
-/** @type {string[]} Short month names, January first. */
-const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
 
 /**
  * The key a date with no rotation falls under.
@@ -61,7 +54,7 @@ function dayLabel_(isoDate) {
  * @returns {string} ISO 'yyyy-MM-dd' of that Monday.
  */
 function mondayOf_(isoDate) {
-  return addDays(isoDate, -mondayFirstIndex(isoDate));
+  return addDays(isoDate, -weekdayOf(isoDate).index);
 }
 
 /**

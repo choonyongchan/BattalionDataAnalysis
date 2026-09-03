@@ -24,6 +24,7 @@
 
 import { cloneElement } from 'preact';
 import { useState } from 'preact/hooks';
+import { Segmented, VIEW_OPTIONS } from '../components/Segmented.jsx';
 
 /**
  * A card holding one chart and its table twin.
@@ -43,7 +44,14 @@ export function ChartCard({ title, note, coverage, empty, children }) {
     <section class="card">
       <div class="card__head">
         <h3 class="card__title">{title}</h3>
-        {blank ? null : <ViewToggle view={view} onChange={setView} title={title} />}
+        {blank ? null : (
+          <Segmented
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={setView}
+            label={title + ': chart or table'}
+          />
+        )}
       </div>
       {note ? <p class="card__note">{note}</p> : null}
       {blank ? (
@@ -67,28 +75,4 @@ export function ChartCard({ title, note, coverage, empty, children }) {
  */
 function isBlank_(chart) {
   return Boolean(chart && chart.type && chart.type.isEmpty && chart.type.isEmpty(chart.props));
-}
-
-/**
- * The Chart/Table segmented control.
- * @param {{view: string, onChange: function(string): void, title: string}} props The
- *     current view, the setter, and the card title the control is labelled against.
- * @returns {!Object} The control.
- */
-function ViewToggle({ view, onChange, title }) {
-  return (
-    <div class="toggle" role="group" aria-label={title + ': chart or table'}>
-      {['chart', 'table'].map((option) => (
-        <button
-          key={option}
-          type="button"
-          class="button button--toggle"
-          aria-pressed={String(view === option)}
-          onClick={() => onChange(option)}
-        >
-          {option === 'chart' ? 'Chart' : 'Table'}
-        </button>
-      ))}
-    </div>
-  );
 }

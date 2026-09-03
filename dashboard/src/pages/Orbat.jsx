@@ -16,7 +16,7 @@ import { ChartCard, Tree } from '../charts/index.js';
 import { COMPANIES } from '../model/domain.js';
 import { datesPresent } from '../model/metrics.js';
 import { orbatCoverage, orbatTree } from '../model/orbat.js';
-import { fmtDate, fmtFraction } from '../components/format.js';
+import { fmtDate, fmtFraction } from '../format.js';
 
 /**
  * The ORBAT page.

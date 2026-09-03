@@ -25,7 +25,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { baseOption, prefersReducedMotion } from './theme.js';
 
@@ -71,7 +71,7 @@ function option_(props, palette) {
       formatter: (params) =>
         tooltipLines(
           params.name,
-          [fmtCount(params.value) + (params.value === 1 ? ' mention' : ' mentions')],
+          [fmtInt(params.value) + (params.value === 1 ? ' mention' : ' mentions')],
           palette
         ),
     },
@@ -119,7 +119,7 @@ export function WordCloud(props) {
     return (
       <TableTwin
         columns={[{ label: 'Word' }, { label: 'Mentions', numeric: true }]}
-        rows={words.map((word) => [word.word, fmtCount(word.count)])}
+        rows={words.map((word) => [word.word, fmtInt(word.count)])}
         caption="Free-text report-sick keywords by number of mentions"
       />
     );

@@ -1,5 +1,5 @@
 /**
- * The left rail: brand, the eight pages, and the two session controls.
+ * The left rail: brand, the seven pages, and the two session controls.
  *
  * It is a rail rather than a top tab strip because the three medical pages are read
  * against each other — a commander looks at report sick, then MC, then status, comparing

@@ -3,7 +3,7 @@
  *
  * The three pages ask the same four questions — is it trending, which company, which
  * platoon, who most often — so one renderer answers them, parameterised per category by
- * a spec object exactly as the previous implementation's `views/category.js` was.
+ * a spec object exactly as the previous implementation was.
  * Everything unique to one page (the Sankey stays on Overview; locations, long-MC, a word
  * cloud, an hour-of-day histogram) is an opt-in flag on the spec rather than a fork of
  * this file, so the three pages cannot drift into three different layouts.
@@ -16,12 +16,11 @@ import { useMemo, useState } from 'preact/hooks';
 import { dateFrom, dateTo } from '../../app/state.js';
 import { Card, Coverage, EmptyState } from '../../components/Card.jsx';
 import { Tile, TileRow } from '../../components/Tile.jsx';
-import { ScopeToggle } from '../../components/ScopeToggle.jsx';
-import { GranularityRadio } from '../../components/GranularityRadio.jsx';
+import { Segmented, SCOPE_OPTIONS } from '../../components/Segmented.jsx';
 import { DateRangePicker, PresetBar } from '../../components/DateRangePicker.jsx';
 import { SoldierSearch } from '../../components/SoldierSearch.jsx';
 import { Leaderboard } from '../../components/Leaderboard.jsx';
-import { fmtDate, fmtFraction, fmtInt } from '../../components/format.js';
+import { fmtDate, fmtFraction, fmtInt } from '../../format.js';
 import { Bar, ChartCard, GroupedBar, Heatmap, Histogram, Line, WordCloud } from '../../charts/index.js';
 import { COMPANIES, PLATOONS, UNASSIGNED } from '../../model/domain.js';
 import { toHolidays, holidaysIn, weekendBands } from '../../model/calendarMarks.js';
@@ -91,7 +90,7 @@ function TrendSection({ title, coverage, trendFn, dates, weekends, holidays }) {
   return (
     <Card title={title}>
       <div class="controlrow">
-        <ScopeToggle value={scope} onChange={setScope} />
+        <Segmented options={SCOPE_OPTIONS} value={scope} onChange={setScope} label="Chart scope" />
       </div>
       <ChartCard title="" coverage={coverage}>
         <Line
@@ -155,7 +154,13 @@ function ReasonsOverTime({ items, rotations }) {
   return (
     <Card title="Top reasons over time">
       <div class="controlrow">
-        <GranularityRadio value={granularity} onChange={setGranularity} />
+        <Segmented
+          options={GRANULARITIES}
+          value={granularity}
+          onChange={setGranularity}
+          label="Group dates by"
+          radio
+        />
       </div>
       <ChartCard title="" empty="No reasons recorded in range.">
         <GroupedBar categories={trend.categories} series={trend.series} />

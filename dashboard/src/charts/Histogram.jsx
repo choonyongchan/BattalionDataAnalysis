@@ -19,7 +19,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import { axisOption, baseOption, legendOption, seriesColor, valueAxisOption } from './theme.js';
 
@@ -71,7 +71,7 @@ function option_(props, palette) {
           params[0].axisValue,
           params.map((point) => ({
             label: point.seriesName,
-            value: fmtCount(point.value),
+            value: fmtInt(point.value),
             color: point.color,
           })),
           palette
@@ -121,7 +121,7 @@ export function Histogram(props) {
     return (
       <TableTwin
         columns={[{ label: 'Time' }, ...series.map((entry) => ({ label: entry.name, numeric: true }))]}
-        rows={bins.map((bin) => [bin.label, ...series.map((entry) => fmtCount(entry.read(bin) ?? 0))])}
+        rows={bins.map((bin) => [bin.label, ...series.map((entry) => fmtInt(entry.read(bin) ?? 0))])}
         caption={(valueName || 'Submissions') + ' by time of day'}
       />
     );

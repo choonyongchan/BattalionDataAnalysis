@@ -20,7 +20,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipLines } from './tooltip.js';
 import { axisOption, baseOption } from './theme.js';
 
@@ -149,7 +149,7 @@ function option_(props, palette) {
         return tooltipLines(
           entry.row + ' · ' + entry.column,
           [
-            (valueName || 'Value') + ': ' + fmtCount(entry.value),
+            (valueName || 'Value') + ': ' + fmtInt(entry.value),
             ...(detail ? detail(entry) : []),
             entry.inferred ? INFERRED_NOTE : '',
           ],
@@ -223,7 +223,7 @@ export function Heatmap(props) {
           ...columns.map((column) => {
             const cell = byKey.get(row + '|' + column);
             return {
-              text: cell ? fmtCount(cell.value) : '—',
+              text: cell ? fmtInt(cell.value) : '—',
               inferred: Boolean(cell && cell.inferred),
             };
           }),

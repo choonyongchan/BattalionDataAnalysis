@@ -10,8 +10,10 @@
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { addMonths, daysOfMonth, firstOfMonth, mondayFirstIndex, matchPreset, PRESETS } from '../model/dateRange.js';
-import { fmtDate } from './format.js';
+import { addMonths, daysOfMonth, firstOfMonth, matchPreset, PRESETS } from '../model/dateRange.js';
+import { weekdayOf } from '../model/dates.js';
+import { fmtDate } from '../format.js';
+import { Segmented } from './Segmented.jsx';
 
 /** @type {string[]} Month names for the popover header. */
 const MONTHS = [
@@ -41,7 +43,7 @@ function monthLabel(isoFirst) {
  */
 function MonthGrid({ shownMonth, min, max, from, to, onPick }) {
   const days = daysOfMonth(shownMonth);
-  const blanks = mondayFirstIndex(days[0]);
+  const blanks = weekdayOf(days[0]).index;
 
   return (
     <div class="calendar__grid">
@@ -201,20 +203,12 @@ export function DateRangePicker({ min, max, from, to, onChange }) {
  * @returns {!preact.VNode} The preset row.
  */
 export function PresetBar({ from, to, today, onSelect }) {
-  const active = matchPreset(from, to, today);
   return (
-    <div class="toggle" role="group" aria-label="Quick date ranges">
-      {PRESETS.map((preset) => (
-        <button
-          key={preset.name}
-          type="button"
-          class="button button--toggle"
-          aria-pressed={active === preset.name}
-          onClick={() => onSelect(preset.name)}
-        >
-          {preset.label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      options={PRESETS}
+      value={matchPreset(from, to, today)}
+      onChange={onSelect}
+      label="Quick date ranges"
+    />
   );
 }

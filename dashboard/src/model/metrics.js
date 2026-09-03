@@ -21,7 +21,7 @@
 import { classify, DUTY_CLASS, extractSymptoms, isAbsent, isRestricted } from './classify.js';
 import { identityOf } from './identity.js';
 import { COMPANIES, PLATOONS, UNIT_TYPE_COMPANY } from './domain.js';
-import { inclusiveDaySpan, weekdayOf } from './dates.js';
+import { inclusiveDaySpan } from './dates.js';
 import { toIsoDate, toNumber, toText } from './values.js';
 import { eachDay, withinRange } from './dateRange.js';
 
@@ -72,19 +72,6 @@ export function datesPresent(rows) {
     }
   });
   return Array.from(dates).sort();
-}
-
-/**
- * Lists the sessions filed on a given date, in parade order.
- * @param {Array<!Object>} rows Rows carrying `date` and `session`.
- * @param {string} isoDate The date to inspect.
- * @returns {string[]} Sessions present, FPS before LPS.
- */
-export function sessionsOn(rows, isoDate) {
-  const present = new Set(
-    rows.filter((row) => toIsoDate(row.date) === isoDate).map((row) => toText(row.session))
-  );
-  return ['FPS', 'LPS'].filter((session) => present.has(session));
 }
 
 /**
@@ -558,72 +545,6 @@ export function strengthMix(strengthRows, personnelRows, isoDate, session) {
 }
 
 /**
- * Per-company strength and absence mix for one parade.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {string} isoDate Parade date.
- * @param {string} session Parade session.
- * @returns {Array<!Object>} One entry per reporting company, weakest first.
- */
-export function companyBreakdown(strengthRows, personnelRows, isoDate, session) {
-  const strength = battalionStrength(strengthRows, isoDate, session);
-
-  return strength.byCompany
-    .map((entry) => {
-      const rows = personnelRows.filter((row) => toText(row.company) === entry.company);
-      const duty = dutyCountsOn(rows, isoDate, session);
-      const reasons = {};
-      ABSENCE_REASONS.forEach((reason) => {
-        reasons[reason.dutyClass] = duty.counts[reason.dutyClass] || 0;
-      });
-      const absent = (entry.strength || 0) - (entry.present || 0);
-      return {
-        company: entry.company,
-        strength: entry.strength,
-        present: entry.present,
-        absent,
-        percentPresent: entry.strength > 0 ? (entry.present / entry.strength) * 100 : null,
-        percentAbsent: entry.strength > 0 ? (absent / entry.strength) * 100 : null,
-        status: duty.counts[DUTY_CLASS.STATUS] || 0,
-        reasons,
-        named: sum_(Object.values(reasons)),
-        // Signed, not clamped. Cougar names more absentees than its strength gap
-        // accounts for in the labelled data, and clamping that to zero would hide a
-        // real disagreement between two hand-written parts of the same message.
-        unaccounted: absent - sum_(Object.values(reasons)),
-      };
-    })
-    .sort((a, b) => (a.percentPresent || 0) - (b.percentPresent || 0));
-}
-
-/**
- * One duty class counted per parade date, as a headcount and as a percentage.
- *
- * The rate is what a trend needs: a rising count across a month when the battalion is
- * also growing says nothing on its own.
- * @param {Array<!Object>} personnelRows Normalised Personnel Data records.
- * @param {Array<!Object>} strengthRows Normalised Strength Data records.
- * @param {string} dutyClass Duty class to trend, from DUTY_CLASS.
- * @param {string} session Parade session.
- * @returns {Array<!Object>} One entry per date, oldest first.
- */
-export function categoryTrend(personnelRows, strengthRows, dutyClass, session) {
-  return datesPresent(strengthRows).map((date) => {
-    const strength = battalionStrength(strengthRows, date, session);
-    const duty = dutyCountsOn(personnelRows, date, session);
-    const count = duty.counts[dutyClass] || 0;
-    return {
-      date,
-      count,
-      accountable: strength.accountable,
-      per100: strength.accountable > 0 ? (count / strength.accountable) * 100 : null,
-      isComplete: strength.isComplete,
-      companiesReporting: strength.companiesReporting.length,
-    };
-  });
-}
-
-/**
  * The length of an episode in days, for the long-MC test.
  *
  * The stated day count wins when the message gave one, exactly as the rest of the Att
@@ -860,72 +781,6 @@ export function topReasonsOn(personnelRows, isoDate, session, dutyClass, limit) 
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
     .slice(0, limit || 3);
-}
-
-/**
- * Distribution of episode start dates across the days of the week.
- *
- * The bridge-day question: absences clustering on Mondays and Fridays behave differently
- * from absences spread evenly, and the difference is visible only once start dates are
- * counted per weekday rather than per calendar date.
- * @param {Array<!Object>} episodes Episodes to count.
- * @returns {Array<{name: string, count: number}>} Counts, Monday first.
- */
-export function weekdayDistribution(episodes) {
-  const counts = [0, 0, 0, 0, 0, 0, 0];
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  episodes.forEach((episode) => {
-    if (episode.startDate) {
-      counts[weekdayOf(episode.startDate).index] += 1;
-    }
-  });
-  return names.map((name, index) => ({ name, count: counts[index] }));
-}
-
-/**
- * Distribution of episode durations, in whole days.
- * @param {Array<!Object>} episodes Episodes to count.
- * @returns {Array<{days: number, count: number}>} Counts by duration, shortest first.
- */
-export function durationDistribution(episodes) {
-  const counts = new Map();
-  episodes.forEach((episode) => {
-    const days = Math.max(1, Math.round(episode.daysLost));
-    counts.set(days, (counts.get(days) || 0) + 1);
-  });
-  return Array.from(counts.entries())
-    .map(([days, count]) => ({ days, count }))
-    .sort((a, b) => a.days - b.days);
-}
-
-/**
- * Counts how often each symptom appears, and how much of the data said anything at all.
- *
- * Coverage travels with the counts because it is low in the parade state — only 16 of
- * 61 `Att C` rows in the real data carry a symptom, the rest being a bare "MC".
- * A symptom chart drawn over a quarter of the episodes would otherwise read as the whole
- * picture.
- * @param {Array<!Object>} episodes Episodes carrying a `symptoms` array.
- * @returns {!Object} Sorted symptom counts plus the share of episodes that named one.
- */
-export function symptomCounts(episodes) {
-  const counts = new Map();
-  let described = 0;
-  episodes.forEach((episode) => {
-    if (episode.symptoms.length > 0) {
-      described += 1;
-    }
-    episode.symptoms.forEach((symptom) => counts.set(symptom, (counts.get(symptom) || 0) + 1));
-  });
-
-  return {
-    counts: Array.from(counts.entries())
-      .map(([symptom, count]) => ({ symptom, count }))
-      .sort((a, b) => b.count - a.count || a.symptom.localeCompare(b.symptom)),
-    described,
-    total: episodes.length,
-    coverage: episodes.length > 0 ? described / episodes.length : null,
-  };
 }
 
 /**

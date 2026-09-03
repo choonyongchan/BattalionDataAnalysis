@@ -1,8 +1,8 @@
 /**
  * The table half of every chart card.
  *
- * `js/ui.js` calls the table twin "half the feature" and it is right: it is the accessible
- * equivalent for anything encoded by colour or position, it is what S1 copies figures out
+ * The previous implementation called the table twin "half the feature" and it is right:
+ * it is the accessible equivalent for anything encoded by colour or position, it is what S1 copies figures out
  * of into a brief, and it is what makes a tooltip an enhancement rather than the only way
  * to read a value. Every chart component in this directory builds one of these from the
  * same props it draws from, so the two views cannot disagree — the table is never assembled

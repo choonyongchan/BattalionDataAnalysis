@@ -126,7 +126,7 @@ layer is pure and needs no browser.
 as it sits. It is the spreadsheet's fourth party, and the only one that never writes to it.
 
 **It used to have no build step, and losing that was a real cost.** The build is here
-because eight pages of legend toggles, granularity radios, a fuzzy combobox and a live
+because seven pages of legend toggles, granularity radios, a fuzzy combobox and a live
 light/dark switch are more state than an imperative DOM layer carries without turning into
 a hand-rolled framework — and because the chart palette is read from CSS custom properties,
 which a runtime theme switch has to be able to re-read. What the build bought back: ECharts

@@ -14,7 +14,7 @@
 
 import { Plot } from './Plot.jsx';
 import { TableTwin } from './TableTwin.jsx';
-import { fmtCount } from './format.js';
+import { fmtInt } from '../format.js';
 import { tooltipNode } from './tooltip.js';
 import {
   axisOption,
@@ -57,7 +57,7 @@ function option_(props, palette) {
           params[0].name,
           params.map((point) => ({
             label: point.seriesName,
-            value: fmtCount(point.value),
+            value: fmtInt(point.value),
             color: point.color,
           })),
           palette
@@ -109,7 +109,7 @@ export function GroupedBar(props) {
         ]}
         rows={categories.map((category, index) => [
           category,
-          ...series.map((entry) => fmtCount(entry.values[index])),
+          ...series.map((entry) => fmtInt(entry.values[index])),
         ])}
         caption={valueName ? valueName + ' by category and series' : 'Values by category'}
       />

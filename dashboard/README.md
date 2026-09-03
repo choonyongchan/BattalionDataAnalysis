@@ -4,7 +4,7 @@ A dashboard over the spreadsheet the parade-state and FormSG pipelines write to.
 
 ## What it is for
 
-Eight pages, in the order a commander reads them:
+Seven pages, in the order a commander reads them:
 
 | Page | Answers |
 |---|---|

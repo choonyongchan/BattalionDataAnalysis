@@ -24,8 +24,9 @@ Data" (a clean time series of strength numbers), "Personnel Data" (one row
 per person) and "Command Roster". Anything that doesn't validate, and anything
 that fails outright (API error, malformed response), is recorded on the
 submission's own row: `parade_response_id` reads `ERROR` and the reason sits
-beside it in `error`. Nothing is ever silently dropped. A Looker Studio
-dashboard reads "Strength Data" and "Personnel Data" directly as data sources.
+beside it in `error`. Nothing is ever silently dropped. The dashboard in
+`dashboard/` reads "Strength Data" and "Personnel Data" through the
+`?route=dashboard` feed on this project's own web app.
 
 ## 2. Why this architecture
 
@@ -134,7 +135,7 @@ splitting messages into independent "blocks" (the old design's approach),
 the response schema has a single `platoons` array whose first entry is the
 mandatory company total (`platoon: "Company"`, `unit_type: "Company"`) — the
 whole message is one extraction, and the company total is just another row
-rather than a separate top-level object, so both grains Looker Studio needs
+rather than a separate top-level object, so both grains the dashboard needs
 read out of one tab: a company-wide trend line and a per-platoon breakdown,
 filterable by `platoon` and `unit_type` in "Strength Data".
 
@@ -152,15 +153,15 @@ the AI to separate the day-count/date-range portion (`duration`, e.g. "7D
 (170626-300626)") from the underlying reason/condition/appointment text
 (`reason`, e.g. "MC"), for every personnel entry regardless of category —
 not just Att C/MC and Report Sick — so "Personnel Data" has one consistent
-schema a Looker Studio table or filter can rely on, rather than duration
-sometimes being embedded in free text and sometimes not.
+schema a table or filter can rely on, rather than duration sometimes being
+embedded in free text and sometimes not.
 
 **Two output sheets, not one combined sheet.** The old "Canonical Data"
 sheet put strength figures and one absentee's detail on the same row, which
 means a platoon's strength number gets duplicated across every personnel row
 for that platoon (or once with blank personnel fields, if there are none). A
-Looker Studio time-series chart of `total_strength` over `date` doesn't want
-that duplication or those blank-row artifacts. Splitting into "Strength
+time-series chart of `total_strength` over `date` doesn't want that
+duplication or those blank-row artifacts. Splitting into "Strength
 Data" (always exactly company-total-row-plus-one-row-per-platoon, per
 submission) and "Personnel Data" (exactly one row per person, per
 submission) keeps both cleanly chartable on their own terms and keyed
@@ -186,8 +187,8 @@ computed, `deleteDuplicateRawResponses_` removes any other row persisted with th
 same key and `deleteOutputsForKey()` clears any prior Strength Data / Personnel
 Data / Command Roster rows for it before fresh output is written. This keeps "at
 most one outcome per company+date+session" true, which is what makes a
-resubmission converge cleanly instead of leaving stale numbers behind for Looker
-Studio to double-count.
+resubmission converge cleanly instead of leaving stale numbers behind for the
+dashboard to double-count.
 
 `processRow` also takes `previousId` — the key the row held before a maintainer
 cleared it. A corrected message can resolve to a *different* key (a fixed date,
@@ -264,7 +265,7 @@ Maintainer clears a row's parade_response_id    [forced re-run]
   lock too, so it propagates to handlePost and is rethrown, producing the 5xx that makes
   the bridge resend.
 
-  Looker Studio reads "Strength Data" and "Personnel Data" directly as Google Sheets data sources.
+  The dashboard reads "Strength Data" and "Personnel Data" through the ?route=dashboard feed.
 ```
 
 ## 4. File responsibilities
@@ -580,7 +581,7 @@ the full verified NRIC. The column stays so pasted CSV rows still line up — on
 ### 8.5.1 Timestamps are stored as dates, not text
 
 The webhook path writes `submittedAt` as a real `Date`, so the column sorts
-chronologically and Looker Studio reads it as a date. An unparseable value falls back
+chronologically and reads back as a date downstream. An unparseable value falls back
 to the raw string rather than writing an `Invalid Date`.
 
 The CSV path cannot make that guarantee: whether Google Sheets parses FormSG's

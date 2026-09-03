@@ -29,18 +29,6 @@ export function buildIntakeUrl(baseUrl) {
 }
 
 /**
- * Builds the request body the handler expects.
- *
- * @param {string} text The raw parade-state text.
- * @param {string} messageId Baileys message id, used server-side as the dedup key.
- * @param {string} token The shared ingest token.
- * @returns {{token: string, messageId: string, text: string}} The relay payload.
- */
-export function buildIntakePayload(text, messageId, token) {
-  return { token, messageId, text };
-}
-
-/**
  * Posts one parade state to the web app.
  *
  * @param {string} text The raw parade-state text.
@@ -55,7 +43,7 @@ export async function relayParadeState(text, messageId, config) {
   const response = await fetch(buildIntakeUrl(config.appsScriptUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildIntakePayload(text, messageId, config.appsScriptToken)),
+    body: JSON.stringify({ token: config.appsScriptToken, messageId, text }),
   });
 
   if (!response.ok) {

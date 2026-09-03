@@ -4,8 +4,8 @@
  * This is not a style preference. An ECharts tooltip formatter that returns a string has
  * that string parsed as HTML, and every value a tooltip here shows — a company name, a
  * soldier's name, a free-text report-sick reason — reaches the dashboard from a WhatsApp
- * message a person typed. `js/charts.js` made the same call and said so at its heatmap
- * formatter; it is the one rule from the old implementation carried forward without
+ * message a person typed. The previous implementation made the same call and said so at
+ * its heatmap formatter; it is the one rule from it carried forward without
  * qualification.
  *
  * ECharts 5 accepts an `HTMLElement` back from a formatter, so the fix costs nothing:
