@@ -22,6 +22,11 @@
  *
  * Note that changes to this file only take effect after redeploying the web app
  * — a `clasp push` alone is not enough. See README.md.
+ *
+ * For the same reason it hosts `doPost`, this file also hosts the project's one
+ * `onEditHandler` global: `ScriptApp.newTrigger` needs a single top-level function
+ * name, but the parade-state pipeline (`Parser.onEditHandler`) and the FormSG
+ * CSV-import repair (`FormSgTimestamps.onEditHandler`) both need to run off it.
  */
 
 /**
@@ -79,4 +84,19 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unknown_route' })).setMimeType(
     ContentService.MimeType.JSON
   );
+}
+
+/**
+ * Installable onEdit trigger, shared by every module that needs one.
+ *
+ * Apps Script fires this for edits anywhere in the bound spreadsheet, so each
+ * handler is responsible for filtering to the sheet and columns it cares about —
+ * see `Parser.onEditHandler` and `FormSgTimestamps.onEditHandler`. Installed by
+ * `Parser.installTriggers()` under this function's name.
+ * @param {!GoogleAppsScript.Events.SheetsOnEdit} e The edit event.
+ * @returns {void}
+ */
+function onEditHandler(e) {
+  Parser.onEditHandler(e);
+  FormSgTimestamps.onEditHandler(e);
 }

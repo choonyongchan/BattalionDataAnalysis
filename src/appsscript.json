@@ -8,10 +8,6 @@
       {
         "menuName": "reprocessPendingRows",
         "functionName": "reprocessPendingRows"
-      },
-      {
-        "menuName": "formSgNormaliseTimestamps",
-        "functionName": "formSgNormaliseTimestamps"
       }
     ]
   },

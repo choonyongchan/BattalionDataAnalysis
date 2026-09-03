@@ -72,6 +72,14 @@ class FakeRange {
   }
 
   /**
+   * Returns the range's first row, as Range.getRow does.
+   * @returns {number} The 1-based row.
+   */
+  getRow() {
+    return this.row;
+  }
+
+  /**
    * Reads the range's top-left cell, as Range.getValue does.
    * @returns {*} The cell value, or '' when unset.
    */
@@ -278,7 +286,7 @@ export function loadFormSg(options) {
   // Share the host realm's intrinsics with the context. Apps Script runs everything
   // in a single realm, so a Date the module constructs and a Date a test constructs
   // must be the same Date — otherwise `value instanceof Date` in
-  // FormSgTimestamps.normalise fails across the vm boundary, which would be an
+  // FormSgTimestamps.onEditHandler fails across the vm boundary, which would be an
   // artifact of this harness rather than a fault in the code under test.
   Object.assign(context, SHARED_INTRINSICS);
 
@@ -292,8 +300,8 @@ export function loadFormSg(options) {
   // lexically-scoped class and const bindings escape the vm script.
   const epilogue = `;({
     FormSgSchema, FormSgSheet, FormSgTimestamps, doPost, WEB_APP_ROUTES,
-    formSgVerifySetup, formSgNormaliseTimestamps,
-    FORMSG_COLUMNS, FORMSG_SHEET_NAME, FORMSG_TIMESTAMP_HEADER,
+    formSgVerifySetup,
+    FORMSG_COLUMNS, FORMSG_SHEET_NAME, FORMSG_TIMESTAMP_HEADER, FORMSG_RESPONSE_ID_HEADER,
   })`;
 
   const globals = vm.runInContext(sources.join('\n') + epilogue, context, { filename: 'formsg-bundle.js' });
@@ -406,7 +414,7 @@ export function loadParser(options) {
 
   const epilogue = `;({
     Parser, ParserAi, ParserRows, ParserSchema, ParserSheets,
-    onEditHandler, onFormSubmitHandler, reprocessRow, reprocessPendingRows, installTriggers, removeTriggers,
+    onFormSubmitHandler, reprocessRow, reprocessPendingRows, installTriggers, removeTriggers,
     SHEET_NAMES, RAW_RESPONSES_COLUMNS, STRENGTH_DATA_COLUMNS, PERSONNEL_DATA_COLUMNS,
     COMMAND_ROSTER_COLUMNS, SCRIPT_OWNED_SHEETS, PARADE_ERROR_SENTINEL, PARADE_PROCESSING_SENTINEL,
     COMPANIES, SESSIONS, REASON_CATEGORIES, UNIT_TYPES, COMMAND_ROLES,

@@ -322,7 +322,9 @@ class Parser {
    * gesture. Idempotent — removes existing copies first, so re-running never
    * creates duplicates.
    *
-   * The WhatsApp intake needs no trigger; it arrives through the web app.
+   * The WhatsApp intake needs no trigger; it arrives through the web app. The
+   * `onEdit` trigger also drives `FormSgTimestamps.onEditHandler` — see
+   * `src/WebApp.js`, which hosts the shared `onEditHandler` global.
    * @returns {void}
    */
   static installTriggers() {
@@ -330,7 +332,10 @@ class Parser {
     const spreadsheet = SpreadsheetApp.getActive();
     ScriptApp.newTrigger('onFormSubmitHandler').forSpreadsheet(spreadsheet).onFormSubmit().create();
     ScriptApp.newTrigger('onEditHandler').forSpreadsheet(spreadsheet).onEdit().create();
-    Logger.log('Installed onFormSubmitHandler (Form fallback) and onEditHandler (forced reprocess).');
+    Logger.log(
+      'Installed onFormSubmitHandler (Form fallback), onEditHandler (forced reprocess and FormSG ' +
+        'timestamp repair).'
+    );
   }
 
   /**
@@ -353,16 +358,6 @@ class Parser {
  */
 function onFormSubmitHandler(e) {
   Parser.onFormSubmitHandler(e);
-}
-
-/**
- * Global entry point required because ScriptApp trigger handlers must be a
- * top-level function name, not a class static method.
- * @param {!GoogleAppsScript.Events.SheetsOnEdit} e The edit event.
- * @returns {void}
- */
-function onEditHandler(e) {
-  Parser.onEditHandler(e);
 }
 
 /**

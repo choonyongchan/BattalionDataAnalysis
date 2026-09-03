@@ -9,6 +9,10 @@
  * second intake (the WhatsApp parade-state bridge) now shares it, so `src/WebApp.js`
  * owns the global and dispatches `?route=reportsick` to FormSgSheet.handlePost.
  * Plumber's URL must carry that parameter.
+ *
+ * `FormSgTimestamps.onEditHandler` has no wrapper here — it runs off the same
+ * installable `onEdit` trigger as the parade-state pipeline, dispatched from the
+ * shared `onEditHandler` global in `src/WebApp.js`.
  */
 
 /**
@@ -17,13 +21,4 @@
  */
 function formSgVerifySetup() {
   FormSgSchema.verify();
-}
-
-/**
- * Rewrites text-shaped Timestamp cells as real Dates. Run this after every FormSG
- * CSV import; also registered as a spreadsheet macro (see appsscript.json).
- * @returns {void}
- */
-function formSgNormaliseTimestamps() {
-  FormSgTimestamps.normalise();
 }

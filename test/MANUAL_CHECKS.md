@@ -124,6 +124,22 @@ Untouched by this change, but it shares the one `doPost`, so it is worth one che
       `<web app URL>?route=reportsick`. Expect one new row on
       **Report Sick FormSG Responses**.
 
+## 7a. CSV-paste timestamps self-correct
+
+Needs `installTriggers` (README §4) to have been run at least once — this rides the
+same `onEdit` trigger as the parade-state pipeline.
+
+- [ ] Paste a few rows of FormSG's CSV export (header included) into
+      **Report Sick FormSG Responses**, with the `Timestamp` column landing as plain
+      text (e.g. `07 May 2026 19:21:00`). Within the paste's own execution, the cells
+      should turn into real, right-aligned dates formatted `dd mmm yyyy hh:mm:ss` —
+      no macro run needed.
+- [ ] Check **Executions** in the script editor for `FormSgTimestamps.onEditHandler`;
+      confirm it logged a converted count and, if the paste had one, an unparsed row.
+- [ ] Edit an unrelated cell (a different column, or a different sheet). Confirm
+      nothing in `Report Sick FormSG Responses`'s `Timestamp` column changes and no
+      matching log line appears.
+
 ## 8. The dashboard feed
 
 The feed reads two more tabs and one projection than it used to, so this needs a

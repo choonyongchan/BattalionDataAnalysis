@@ -121,7 +121,7 @@ What each one is for:
 | Trigger | Fires when | Why |
 |---|---|---|
 | `onFormSubmitHandler` | The Google Form is submitted | The manual fallback path |
-| `onEditHandler` | A row's `parade_response_id` is cleared by hand | Forces a re-run of that parade state, with no editor access needed |
+| `onEditHandler` | Any edit to the spreadsheet | Forces a re-run of a parade state when `parade_response_id` is cleared by hand, with no editor access needed; also repairs a pasted FormSG timestamp on the spot (§8.5) |
 
 The **primary** intake needs no trigger: the WhatsApp bridge POSTs to the web
 app, which appends the row and processes it in the same execution (§9). Neither
@@ -339,14 +339,15 @@ rows leave that cell blank. The column exists so pasted CSV rows still line up.
 FormSG's CSV export stays the authoritative record. To refresh from it:
 
 1. Clear **Report Sick FormSG Responses** and paste the full export, header included.
-2. Run **Extensions → Macros → formSgNormaliseTimestamps**.
 
-Step 2 is not optional. Depending on how the paste lands, Google Sheets either
-parses FormSG's `07 May 2026 19:21:00` timestamps into real dates or leaves them as
-plain text — and a column that is half one and half the other will not sort, and is
-not read as a date by anything downstream. The macro converts any text timestamps it
-finds, leaves real dates alone, and reports anything it could not parse. It is safe
-to run at any time and safe to run twice.
+That's it. Depending on how the paste lands, Google Sheets either parses FormSG's
+`07 May 2026 19:21:00` timestamps into real dates or leaves them as plain text — and
+a column that is half one and half the other will not sort, and is not read as a
+date by anything downstream. The `onEditHandler` trigger installed in §4 catches
+this the moment the paste lands: it converts any text timestamps in the edited
+rows, leaves real dates alone, and logs anything it could not parse (Executions, in
+the script editor). It needs `installTriggers` (§4) to have been run at least once —
+if the paste doesn't self-correct, check that first.
 
 Between imports the webhook simply appends new rows in the same format.
 
@@ -371,7 +372,7 @@ Between imports the webhook simply appends new rows in the same format.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Plumber reports the webhook step failed, but the row appears anyway | Apps Script answers POSTs with a 302 redirect, which some clients count as a failure even though the script already ran | Harmless — dedup prevents duplicate rows |
-| The `Timestamp` column won't sort, or is treated as text | A CSV import pasted timestamps as text | Run `formSgNormaliseTimestamps` (§8.5) |
+| The `Timestamp` column won't sort, or is treated as text | The `onEditHandler` trigger isn't installed, so a CSV import's text timestamps were never repaired | Run `installTriggers` (§4), then re-paste the affected rows (§8.5) |
 | One column is blank on every new row | That header has no matching line in the Plumber body | Add it in §8.3 — the sheet header and the Plumber key must match character for character |
 | Every submission fails, and Executions shows `bad_request` | A free-text answer contained a quote or newline that broke Plumber's JSON body | Switch the Plumber action to a form-encoded body, or have it escape the field |
 | `SingPass Validated NRIC` is blank | The form has no Singpass verification, or `NRIC/FIN (Verified)` is unmapped in Plumber | Check the Plumber trigger's sample data actually contains that variable |

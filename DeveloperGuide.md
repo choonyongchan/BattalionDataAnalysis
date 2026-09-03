@@ -233,7 +233,8 @@ Clerk submits the Google Form                   [fallback]
         │  onFormSubmitHandler(e) [installable onFormSubmit trigger]
         │
 Maintainer clears a row's parade_response_id    [forced re-run]
-        │  onEditHandler(e) [installable onEdit trigger]
+        │  onEditHandler(e) [installable onEdit trigger, shared with FormSgTimestamps
+        │                    — see §8.5.1]
         │  previousId = e.oldValue, for a single-cell clear
         │
         └──────────────────┬──────────────────┘
@@ -274,12 +275,14 @@ The parade-state pipeline lives in `src/parser/`. All service files are ES6
 classes with **static** methods — there's no per-instance state, so a class here
 is purely a namespace that groups a service's public surface and its
 `_`-suffixed private helpers. `Parser.js` also exports plain top-level functions
-(`onFormSubmitHandler`, `onEditHandler`, `installTriggers`, `removeTriggers`,
-`reprocessRow`, `reprocessPendingRows`) because trigger handlers, editor-dropdown
-entry points and Sheets menu macros must be global function names for Apps Script
-to invoke them; each immediately delegates
-to the matching `Parser.*` static method. `WebApp.js` exports the project's single
-global `doPost`, for the same reason.
+(`onFormSubmitHandler`, `installTriggers`, `removeTriggers`, `reprocessRow`,
+`reprocessPendingRows`) because trigger handlers, editor-dropdown entry points and
+Sheets menu macros must be global function names for Apps Script to invoke them;
+each immediately delegates to the matching `Parser.*` static method. `WebApp.js`
+exports the project's single global `doPost`, plus the single global `onEditHandler`
+— `ScriptApp.newTrigger` needs one top-level function name, but both
+`Parser.onEditHandler` and `FormSgTimestamps.onEditHandler` need to run off it, so
+`WebApp.js` dispatches to both (see §8.5.1).
 
 `src/` holds **execution code only** — no `setup()`, no `verifySetup()`, no
 diagnostics. Anything that merely verifies lives in `test/`, which is outside the
@@ -292,7 +295,7 @@ clasp deployment boundary. See §4.1.
 | `parser/ParserRows.js` | Structural validation of an extraction; shaping it into row arrays for all three output tabs | `validate`, `buildStrengthRows`, `buildPersonnelRows`, `buildCommandRosterRows` |
 | `parser/ParserSheets.js` | All sheet I/O, every mutating method wrapped in `LockService` | `readText`, `readParadeResponseId`, `appendIfNew`, `markProcessing`, `finishRow`, `deleteDuplicateRawResponses_`, `deleteOutputsForKey`, `appendRows` |
 | `parser/Parser.js` | Every intake into the parade-state pipeline, the processing core, plus trigger install/teardown | `processRow`, `handlePost`, `onEditHandler`, `onFormSubmitHandler`, `reprocessPendingRows`, `installTriggers` |
-| `WebApp.js` | The project's single `doPost`, dispatching by `?route=`; no logic of its own | `doPost` |
+| `WebApp.js` | The project's single `doPost` (dispatching by `?route=`) and single `onEditHandler` (dispatching to every module with a stake in the shared onEdit trigger); no logic of its own | `doPost`, `onEditHandler` |
 | `appsscript.json` | Manifest: timezone, minimal OAuth scopes | — |
 
 Dependency direction is strictly one-way and matches the table's order
@@ -586,11 +589,21 @@ to the raw string rather than writing an `Invalid Date`.
 
 The CSV path cannot make that guarantee: whether Google Sheets parses FormSG's
 `07 May 2026 19:21:00` into a Date or leaves it as text depends on how the export was
-pasted, which is why the column arrived half one and half the other.
-`FormSgTimestamps.normalise` repairs it, and lives in its own file precisely because
-it belongs to the CSV path rather than the webhook one. It parses the format
+pasted, which is why the column used to arrive half one and half the other.
+`FormSgTimestamps.onEditHandler` repairs it the moment the paste lands, scoped to
+whatever rows the edit touched. It lives in its own file precisely because it
+belongs to the CSV path rather than the webhook one, and it parses the format
 explicitly rather than handing it to `new Date(string)`, whose handling of non-ISO
 formats is implementation-defined.
+
+There used to be a `formSgNormaliseTimestamps` Sheets macro doing this as a manual,
+full-column rescan after every paste. It has been removed in favor of the
+`onEditHandler` trigger — the same installable `onEdit` trigger the parade-state
+pipeline already installs (§3, §4 of README.md) now also dispatches to
+`FormSgTimestamps.onEditHandler`, from the shared global in `WebApp.js`. This
+removes a manual step but also removes the one-off full-sheet backfill the macro
+gave you; a row already sitting as text from before this shipped needs a re-paste
+to pick up the fix.
 
 ### 8.6 Testing
 
@@ -603,7 +616,7 @@ lexical scope Apps Script gives them — and stubs `SpreadsheetApp`, `LockServic
 The harness deliberately shares the host realm's intrinsics with the vm context.
 Apps Script runs everything in one realm, so a `Date` the module builds and a `Date`
 a test builds must be the same `Date`; without that, `value instanceof Date` in
-`normalise` fails for reasons that exist only in the harness.
+`onEditHandler` fails for reasons that exist only in the harness.
 
 This replaced `FormSgSelfTest.js`, which ran inside the editor and reported through
 `Logger` — it could not fail a build, and half of what it checked was whether the

@@ -7,33 +7,57 @@
  */
 class FormSgTimestamps {
   /**
-   * Rewrites text-shaped Timestamp cells as real Date values.
+   * Installable onEdit handler: repairs a paste into the Timestamp column as it lands.
    *
    * FormSG's CSV export writes timestamps as "07 May 2026 19:21:00". Whether Google
    * Sheets parses that into a Date or leaves it as text depends on how the export was
-   * pasted, which is why the column arrives half one and half the other. Real Dates
-   * are canonical: they sort chronologically and read back as dates downstream.
+   * pasted, which is why the column used to arrive half one and half the other. Real
+   * Dates are canonical: they sort chronologically and read back as dates downstream.
    *
-   * Re-runnable, and meant to be re-run: every fresh CSV import reintroduces text
-   * timestamps. Cells that are already Dates are left untouched, and anything matching
-   * neither shape is reported rather than guessed at.
+   * Scoped to the rows the edit actually touched, which keeps a full CSV re-paste cheap
+   * and needs no follow-up step. Cells that are already Dates are left untouched, and
+   * anything matching neither shape is reported rather than guessed at.
+   * @param {!GoogleAppsScript.Events.SheetsOnEdit} e The edit event.
    * @returns {void}
    */
-  static normalise() {
+  static onEditHandler(e) {
+    if (!e || !e.range) {
+      return;
+    }
+    if (e.range.getSheet().getName() !== FORMSG_SHEET_NAME) {
+      return;
+    }
+
     const column = FormSgSchema.columnIndex(FORMSG_TIMESTAMP_HEADER);
-    if (column === 0) {
-      Logger.log(`No "${FORMSG_TIMESTAMP_HEADER}" column in FORMSG_COLUMNS — nothing to do.`);
+    if (column === 0 || e.range.getColumn() > column || e.range.getLastColumn() < column) {
       return;
     }
 
-    const sheet = FormSgSchema.sheet();
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      Logger.log('No data rows to normalise.');
+    const firstRow = Math.max(e.range.getRow(), 2);
+    const lastRow = e.range.getLastRow();
+    if (lastRow < firstRow) {
       return;
     }
 
-    const range = sheet.getRange(2, column, lastRow - 1, 1);
+    const range = FormSgSchema.sheet().getRange(firstRow, column, lastRow - firstRow + 1, 1);
+    const { converted, unparsed } = FormSgTimestamps.normaliseRange_(range);
+
+    if (converted > 0 || unparsed.length > 0) {
+      Logger.log(`FormSgTimestamps.onEditHandler: ${converted} converted, ${unparsed.length} unparsed.`);
+      unparsed.forEach((entry) => Logger.log(`  unparsed — ${entry}`));
+    }
+  }
+
+  /**
+   * Rewrites text-shaped Timestamp cells within a range as real Date values.
+   * @param {!GoogleAppsScript.Spreadsheet.Range} range A single-column range over the
+   *     Timestamp column.
+   * @returns {{converted: number, alreadyDates: number, unparsed: !Array<string>}} A
+   *     summary of what the range held.
+   * @private
+   */
+  static normaliseRange_(range) {
+    const firstRow = range.getRow();
     const unparsed = [];
     let converted = 0;
     let alreadyDates = 0;
@@ -48,7 +72,7 @@ class FormSgTimestamps {
 
       const parsed = FormSgTimestamps.parseCsvTimestamp_(String(value));
       if (!parsed) {
-        unparsed.push(`row ${i + 2}: ${value}`);
+        unparsed.push(`row ${firstRow + i}: ${value}`);
         return [value];
       }
       converted++;
@@ -60,9 +84,7 @@ class FormSgTimestamps {
     // a raw serial number. This format also matches FormSG's own CSV rendering.
     range.setNumberFormat('dd mmm yyyy hh:mm:ss');
 
-    Logger.log(`formSgNormaliseTimestamps: ${converted} converted, ${alreadyDates} already Dates, ${unparsed.length} unparsed.`);
-    unparsed.slice(0, 20).forEach((entry) => Logger.log(`  unparsed — ${entry}`));
-    if (unparsed.length > 20) Logger.log(`  …and ${unparsed.length - 20} more.`);
+    return { converted, alreadyDates, unparsed };
   }
 
   /**

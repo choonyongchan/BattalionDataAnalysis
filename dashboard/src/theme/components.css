@@ -240,3 +240,71 @@ tbody tr:last-child td {
     var(--inferred) 3px 4px
   );
 }
+
+/* --------------------------------------------------------------- progress */
+
+/*
+ * The wait made visible. Two things move at different speeds on purpose: the fill
+ * advances over tens of seconds, which is too slow to read as motion, so a sheen crosses
+ * it every two seconds to say the page is still alive. The sheen is decoration and the
+ * global reduced-motion rule stops it; the fill is information and keeps moving, because
+ * its width is set from the elapsed time rather than by an animation.
+ */
+.loading {
+  margin-top: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.loading__track {
+  width: 100%;
+  max-width: 26rem;
+  height: 4px;
+  background: var(--hairline-soft);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.loading__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width 260ms linear;
+}
+
+.loading__fill::after {
+  content: '';
+  display: block;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: loading-sheen 2s ease-in-out infinite;
+}
+
+.loading__stage {
+  font-size: 14px;
+  letter-spacing: -0.224px;
+  color: var(--ink);
+}
+
+.loading__elapsed {
+  font-size: 12px;
+  letter-spacing: -0.12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes loading-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}

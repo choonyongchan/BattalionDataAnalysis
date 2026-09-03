@@ -43,6 +43,19 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      # The suite's only external dependency is fuse.js, imported by
+      # "dashboard/src/model/soldier.js"; the rest of "dashboard/" is UI the tests never
+      # load. fuse.js has no transitive dependencies, so resolve it on its own into
+      # "dashboard/node_modules" — where Bun's module resolution finds it — rather than
+      # running "bun install" and pulling echarts, preact and wouter for nothing. The
+      # install happens in a throwaway directory so "dashboard/package.json" is ignored.
+      # Pinned to the version in "dashboard/bun.lock".
+      - name: Install the test-time dependency
+        run: |
+          mkdir -p dashboard/node_modules
+          tmp="$(mktemp -d)"
+          (cd "$tmp" && bun add fuse.js@7.5.0)
+          mv "$tmp/node_modules/fuse.js" dashboard/node_modules/
       # The model layer is pure and needs no Google account or API key, so the whole suite
       # runs here — "./test/" covers the parser and the dashboard alike. A classification
       # or episode regression fails the deploy rather than reaching the CO as a wrong
