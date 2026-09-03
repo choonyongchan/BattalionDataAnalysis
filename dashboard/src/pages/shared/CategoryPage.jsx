@@ -339,6 +339,7 @@ export function CategoryPage(spec) {
     histogramBuilder,
     soldierIndex,
     extraTiles,
+    afterLeaderboardBuilder,
   } = spec;
 
   const paradeDates = useMemo(() => datesPresent(dataset.strength), [dataset.strength]);
@@ -460,6 +461,8 @@ export function CategoryPage(spec) {
       </Card>
 
       <UnitRankings personnel={dataset.personnel} strength={dataset.strength} dutyClass={dutyClass} />
+
+      {afterLeaderboardBuilder ? afterLeaderboardBuilder(effectiveFrom, effectiveTo) : null}
 
       <Card title="Soldier search">
         <SoldierSearch index={soldierIndex} onSelect={(soldier) => setSoldierKey(soldier.key)} />

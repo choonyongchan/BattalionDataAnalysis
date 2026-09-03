@@ -15,8 +15,8 @@
 
 import { extractSymptoms, keywords } from './classify.js';
 import { normaliseName } from './identity.js';
-import { toIsoDate, toText } from './values.js';
-import { COMPANIES } from './domain.js';
+import { toIsoDate, toNumber, toText } from './values.js';
+import { COMPANIES, UNIT_TYPE_COMPANY } from './domain.js';
 import { battalionStrength } from './metrics.js';
 
 /**
@@ -148,6 +148,85 @@ export function submissionTrend(submissions, strengthRows, dates, options) {
       },
     ],
   };
+}
+
+/**
+ * The soldiers submitting the most FormSG report-sick forms.
+ *
+ * The parade-state "reporting sick" leaderboard (`leaderboards.topByCount` over
+ * `DUTY_CLASS.REPORT_SICK` episodes) and this one answer different questions, because
+ * they are different sources of the same real-world event: a soldier can submit the form
+ * without a matching parade-state row yet, or the reverse. This module has no episode
+ * concept — a FormSG submission is already one event, not a daily snapshot to collapse.
+ * @param {Array<!Object>} submissions Normalised submissions from `toSubmissions`.
+ * @param {number=} limit Rows to return; defaults to 10.
+ * @returns {Array<{key: string, fourD: string, name: string, rank: string, company: string,
+ *     count: number}>} Most submissions first, ties broken by name. No platoon: FormSG's
+ *     "Unit & Coy" answer carries no platoon, so one cannot be shown here — see
+ *     `docs/architecture_patterns.md` on deriving nothing the message does not state.
+ */
+export function topSubmitters(submissions, limit) {
+  const bySoldier = new Map();
+  submissions.forEach((submission) => {
+    if (submission.key === '') return;
+    const entry = bySoldier.get(submission.key) || {
+      key: submission.key,
+      fourD: submission.fourD,
+      name: submission.name,
+      rank: submission.rank,
+      company: submission.company,
+      count: 0,
+    };
+    entry.count += 1;
+    entry.name = submission.name || entry.name;
+    entry.company = submission.company || entry.company;
+    bySoldier.set(submission.key, entry);
+  });
+  return Array.from(bySoldier.values())
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit || 10);
+}
+
+/**
+ * FormSG submission rate by company, over the whole span the submissions and strength
+ * rows both cover.
+ *
+ * There is no platoon-level counterpart: FormSG's "Unit & Coy" answer names a company,
+ * never a platoon, so ranking platoons on "reported sick" is data this dashboard does not
+ * have — the page showing this ranking says so rather than showing an empty column.
+ * @param {Array<!Object>} submissions Normalised submissions, already restricted to the
+ *     range being ranked.
+ * @param {Array<!Object>} strengthRows Normalised Strength Data records, restricted to
+ *     the same range.
+ * @returns {Array<{company: string, count: number, per100: ?number}>} Companies ranked by
+ *     rate, highest first; `per100` is null when the range has no strength on record.
+ */
+export function submissionRateByCompany(submissions, strengthRows) {
+  const counts = new Map(COMPANIES.map((company) => [company, 0]));
+  submissions.forEach((submission) => {
+    if (counts.has(submission.company)) {
+      counts.set(submission.company, counts.get(submission.company) + 1);
+    }
+  });
+
+  const paxDays = new Map(COMPANIES.map((company) => [company, 0]));
+  strengthRows
+    .filter((row) => toText(row.unit_type) === UNIT_TYPE_COMPANY)
+    .forEach((row) => {
+      const company = toText(row.company);
+      if (paxDays.has(company)) {
+        paxDays.set(company, paxDays.get(company) + (toNumber(row.total_strength) || 0));
+      }
+    });
+
+  return COMPANIES.map((company) => {
+    const days = paxDays.get(company);
+    return {
+      company,
+      count: counts.get(company),
+      per100: days > 0 ? (counts.get(company) / days) * 100 : null,
+    };
+  }).sort((a, b) => (b.per100 || 0) - (a.per100 || 0));
 }
 
 /**
