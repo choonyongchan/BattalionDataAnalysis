@@ -109,3 +109,146 @@ select.field {
   letter-spacing: -0.12px;
   color: var(--ink-muted);
 }
+
+/* ---------------------------------------------------------------- date range */
+
+.daterange {
+  position: relative;
+}
+
+.daterange__trigger {
+  min-width: 14rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.daterange__popover {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  left: 0;
+  z-index: 30;
+  padding: var(--space-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.calendar {
+  display: grid;
+  gap: var(--space-sm);
+  width: 17rem;
+  max-width: 100%;
+}
+
+.calendar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.calendar__month {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.224px;
+}
+
+.calendar__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.calendar__nav:hover:not(:disabled) {
+  background: var(--hairline-soft);
+}
+
+.calendar__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar__weekday {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  text-align: center;
+  padding-bottom: var(--space-xxs);
+}
+
+.calendar__day {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+}
+
+.calendar__day:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.calendar__day:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calendar__day--blank {
+  cursor: default;
+}
+
+.calendar__day--in-range {
+  background: var(--accent-wash);
+}
+
+.calendar__day--start,
+.calendar__day--end {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  border-color: var(--accent);
+}
+
+.calendar__hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.calendar__clear {
+  padding: 7px var(--space-sm);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.calendar__clear:hover {
+  border-color: var(--accent);
+}
+
+/* A labelled control: the field-label-plus-input pattern used by every filter. */
+.control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.controlrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+}
