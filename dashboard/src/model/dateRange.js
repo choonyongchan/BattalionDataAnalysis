@@ -5,6 +5,12 @@
  * `null` on both means "no restriction" — the dashboard's long-standing default of
  * reading everything ingested. These helpers stay DOM-free and string-only so they can
  * be unit-tested and reused by `snapshot()` without pulling in the view layer.
+ *
+ * Not using date-fns here: every preset below (`thisWeek`, `lastMonth`, and the rest) is
+ * plain day/month arithmetic that `dates.js`'s existing `addDays`/`addMonths`/
+ * `firstOfMonth`/`mondayFirstIndex` already cover in UTC. date-fns's own week/month
+ * helpers operate on `Date` objects read in local time, which is exactly the drift this
+ * file exists to avoid, so pulling it in here would buy nothing but risk.
  */
 
 import { addDays } from './dates.js';
@@ -97,12 +103,43 @@ export function eachDay(from, to) {
 }
 
 /**
+ * The quick-range preset buttons, in the order they should appear.
+ *
+ * The UI reads this instead of hard-coding the list, so a preset added here shows up on
+ * the button row for free. 'last7' and 'last14' are not on it — they remain valid
+ * `resolvePreset` names for callers that still use them, but they are not buttons.
+ * @type {Array<{name: string, label: string}>}
+ */
+export const PRESETS = [
+  { name: 'thisWeek', label: 'This week' },
+  { name: 'lastWeek', label: 'Last week' },
+  { name: 'thisMonth', label: 'This month' },
+  { name: 'lastMonth', label: 'Last month' },
+  { name: 'all', label: 'All' },
+];
+
+/**
+ * Preset names recognised by `resolvePreset` but not offered as a button.
+ *
+ * Kept working for any caller still requesting them; `matchPreset` falls back to these
+ * only after checking every button preset, so a range that also happens to be a button's
+ * range always reports the button's name.
+ * @type {string[]}
+ */
+const LEGACY_PRESET_NAMES = ['last7', 'last14'];
+
+/**
  * Resolves a named quick-range preset to a concrete `{ from, to }` pair.
  *
  * `today` is passed in rather than read here so the caller controls the clock and the
- * result is testable. "This month" runs from the first of `today`'s month; "All"
- * clears both bounds.
- * @param {string} name One of 'last7', 'last14', 'month', 'all'.
+ * result is testable. Weeks are Monday-first, matching `weekdayOf` in dates.js: a
+ * battalion runs on the working week, not the calendar week. 'thisWeek' and 'thisMonth'
+ * both stop at `today` rather than running to the end of the period — a range that
+ * extended into the future would trail every trend line off to nothing. 'month' is the
+ * original name for what 'thisMonth' now means; it is kept as an exact alias so nothing
+ * that already requests it breaks.
+ * @param {string} name One of 'last7', 'last14', 'thisWeek', 'lastWeek', 'thisMonth',
+ *     'lastMonth', 'month' (alias of 'thisMonth'), 'all'.
  * @param {string} today ISO 'yyyy-MM-dd' to measure back from.
  * @returns {{from: ?string, to: ?string}} The resolved range.
  */
@@ -113,7 +150,18 @@ export function resolvePreset(name, today) {
     case 'last14':
       return { from: addDays(today, -13), to: today };
     case 'month':
-      return { from: today.slice(0, 7) + '-01', to: today };
+    case 'thisMonth':
+      return { from: firstOfMonth(today), to: today };
+    case 'lastMonth': {
+      const thisMonthFirst = firstOfMonth(today);
+      return { from: addMonths(thisMonthFirst, -1), to: addDays(thisMonthFirst, -1) };
+    }
+    case 'thisWeek':
+      return { from: addDays(today, -mondayFirstIndex(today)), to: today };
+    case 'lastWeek': {
+      const thisMonday = addDays(today, -mondayFirstIndex(today));
+      return { from: addDays(thisMonday, -7), to: addDays(thisMonday, -1) };
+    }
     case 'all':
       return { from: null, to: null };
     default:
@@ -174,16 +222,25 @@ export function mondayFirstIndex(isoDate) {
  * Names the preset a `{ from, to }` pair corresponds to, measured from `today`.
  *
  * Lets the control light up the button a range came from, and show none once a hand
- * picked span no longer matches any preset.
+ * picked span no longer matches any preset. Checks `PRESETS` first, so a range that also
+ * happens to match a legacy name (e.g. a Sunday's 'thisWeek' equals that day's 'last7')
+ * always reports the button's name; the legacy names are only a fallback for a range no
+ * button produces.
  * @param {?string} from Range lower bound, or null.
  * @param {?string} to Range upper bound, or null.
  * @param {string} today ISO 'yyyy-MM-dd' the presets are measured from.
  * @returns {?string} The preset name, or null when the pair matches none.
  */
 export function matchPreset(from, to, today) {
-  for (const name of ['all', 'last7', 'last14', 'month']) {
-    const preset = resolvePreset(name, today);
-    if (preset.from === from && preset.to === to) {
+  for (const preset of PRESETS) {
+    const resolved = resolvePreset(preset.name, today);
+    if (resolved.from === from && resolved.to === to) {
+      return preset.name;
+    }
+  }
+  for (const name of LEGACY_PRESET_NAMES) {
+    const resolved = resolvePreset(name, today);
+    if (resolved.from === from && resolved.to === to) {
       return name;
     }
   }

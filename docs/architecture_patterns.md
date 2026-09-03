@@ -20,6 +20,14 @@ another, and a change to one cannot break another.
 | Report sick (FormSG) | `src/formsg/FormSgSheet.js` — `handlePost` | `Report Sick FormSG Responses` |
 | WhatsApp relay | `whatsapp/src/index.js` — a long-running Bun process | POSTs to the parade-state route above |
 
+The WhatsApp relay runs under an in-repo Bun supervisor (`whatsapp/src/supervisor.js`,
+which is what `bun start` runs): it spawns `whatsapp/src/index.js`, forwards its output,
+and restarts it on up to 3 consecutive crashes before exiting non-zero for an OS-level
+relauncher. No new dependency — `Bun.spawn` only. Inside that process the listener holds
+**exactly one** Baileys socket at a time and exits non-zero (for the supervisor to
+recycle) rather than stacking sockets on a flaky link, which would corrupt the persisted
+libsignal session under `whatsapp/auth/`.
+
 One route reads rather than writes: `src/dashboard/DashboardFeed.js` serves the three
 parade-state tabs and the FormSG tab back out to `dashboard/`. See *The dashboard is a
 read-only consumer*.
@@ -105,11 +113,25 @@ That is why `test/` sits at the repo root.
 
 **Bun** (`whatsapp/`, `test/`) — ESM, npm, `bun test`. Ordinary Node-shaped code.
 
+**Browser** (`dashboard/`) — Preact and JSX, built by Vite. Its own `package.json` and
+lockfile, separate from the repo root's, because it is the only part of the project with
+runtime dependencies. `bun run dev` to work on it, `bun run build` to produce `dist/`.
+Its tests still run from `test/dashboard/` under the root `bun test`, because the model
+layer is pure and needs no browser.
+
 ## The dashboard is a read-only consumer
 
-`dashboard/` is a static site — plain ES modules, no build step — served to GitHub Pages
-by `.github/workflows/pages.yml`. It is the spreadsheet's fourth party, and the only one
-that never writes to it.
+`dashboard/` is a Preact application built by Vite and served to GitHub Pages by
+`.github/workflows/pages.yml`, which publishes `dashboard/dist` rather than the directory
+as it sits. It is the spreadsheet's fourth party, and the only one that never writes to it.
+
+**It used to have no build step, and losing that was a real cost.** The build is here
+because eight pages of legend toggles, granularity radios, a fuzzy combobox and a live
+light/dark switch are more state than an imperative DOM layer carries without turning into
+a hand-rolled framework — and because the chart palette is read from CSS custom properties,
+which a runtime theme switch has to be able to re-read. What the build bought back: ECharts
+arrives as an npm dependency and is tree-shaken to the series actually used, instead of a
+1 MB CDN file pinned by an SRI hash that has to be recomputed on every version bump.
 
 It has a server half, and the split is the point. `dashboard/` cannot hold a credential —
 it is a public page — so it holds none: `src/dashboard/DashboardFeed.js` is the third
@@ -136,23 +158,52 @@ Two consequences of that direction:
   the `location` column. `test/dashboard/schema.test.js` asserts every header the
   dashboard requires still exists in the canonical `*_COLUMNS` arrays, so an upstream
   rename fails a test instead of shipping a blank chart.
-- **`dashboard/` is a deployment boundary**, exactly as `src/` is for clasp: everything
-  inside it is published. So its tests live in `test/dashboard/`, and its fixtures
+- **`dashboard/` is a deployment boundary**, exactly as `src/` is for clasp: what the
+  build emits is published. So its tests live in `test/dashboard/`, and its fixtures
   (`test/dashboard/fixtures.js`) are built from the real `PERSONNEL_DATA_COLUMNS` /
   `STRENGTH_DATA_COLUMNS` arrays via `ParserRows`, so the rows under test cannot drift
   from the column order the parser writes.
+- **One tab is read as a projection, not in full.** `Parade State Responses` answers when
+  each company filed, which no output tab can. Its second column is the free text a duty
+  commander typed, and observed messages carry NRICs, full names and diagnoses in one
+  blob. So `DashboardFeed.readColumns_` returns `Timestamp` and `parade_response_id` and
+  nothing else, on the Apps Script side, before the row is serialised — reading the tab
+  whole and letting the browser ignore the body would still have sent it. Pinned in
+  `test/dashboard.feed.test.js` by asserting the body reaches no part of the reply.
+- **Two tabs have no upstream owner.** `Public Holidays` and `Rotations` are read by the
+  dashboard and written by nobody: neither concept exists in `src/`, and an operator
+  creates each tab by hand (`test/MANUAL_CHECKS.md` holds the headers). They are optional
+  reads, so a battalion that has created neither still gets a working dashboard. There is
+  nothing for `schema.test.js` to cross-check them against, and asserting a copy against
+  itself would only look like coverage.
 
-- **The three category views are one renderer, not three.** MC, report sick and status
+- **The three category pages are one renderer, not three.** MC, report sick and status
   ask the same four questions — trend, company, platoon, who most often — so
-  `views/category.js` answers them once and is parameterised per category. Three
-  renderers would drift into three layouts panel by panel, and the whole value of the
-  arrangement is that a commander learns it once and reads it three times.
-- **Chart colour is validated, not chosen.** The categorical palette is capped at four
-  slots because that is what clears the adjacent CVD gates on this surface; forms where
-  any two series can be compared directly are capped at three. Where a form needs more
-  parts than that, the extra parts take the neutral ramp rather than an invented hue: the
-  strength donut has seven slices because it spends colour only on the four that are
-  absent, and the three on parade sit in greys validated as an ordinal ramp instead.
+  `pages/shared/CategoryPage.jsx` answers them once and is parameterised per category.
+  Three renderers would drift into three layouts panel by panel, and the whole value of
+  the arrangement is that a commander learns it once and reads it three times.
+- **Platoon is the one place the dashboard derives rather than reads.** `src/` holds the
+  rule "read what the message says; derive nothing", and `model/platoon.js` is a
+  deliberate read-side exception to it: the `platoon` cell is blank on 100% of Hercules
+  rows, 96% of Cougar's and 39% of Braves', which leaves a platoon heatmap empty for half
+  the battalion. The 4D's leading digit says which platoon a soldier is in, so a blank
+  cell is filled from it. A stated platoon always wins, an inferred one is marked as
+  inferred wherever it is drawn, and the inference rate is printed on the chart.
+- **Chart colour is validated, not chosen, and it lives in one file.** Every colour the
+  dashboard uses is declared in `src/theme/tokens.css` in both themes, and
+  `src/charts/theme.js` reads those custom properties off the document at paint time — so
+  a chart is tinted by the same values as the card it sits in, and an inline hex anywhere
+  breaks that link silently. Forms where any two series are compared directly stay capped
+  at three or four slots. The one deliberate widening is a six-slot ramp for the six
+  companies, which a legend-toggled line chart genuinely needs; it is Okabe-Ito, chosen
+  because six lines on one axis is exactly the case where colour-blind separability
+  decides whether the chart works. Where a form needs more parts than its cap, the extra
+  parts take the neutral ramp rather than an invented hue.
+- **Every chart states its coverage.** Only 5 of 45 parade days in the observed data carry
+  all six companies, and the two data sources cover different spans — parade state from
+  2026-07-11, FormSG from 2026-05-07 — so "all time" means different things on adjacent
+  cards. `model/quality.js` computes those fractions once and every panel prints its own,
+  as a fraction with both parts rather than a bare percentage.
 - **A composition chart is drawn only where the parts sum to the whole it names.** The
   strength donut earns that by construction — `strengthMix` gives every soldier exactly
   one of the sheet's categories, by a documented precedence, and makes `Full duty` the
@@ -163,6 +214,23 @@ Two consequences of that direction:
   slide every Singapore parade state back a day. That failure mode errors nowhere — the
   numbers simply land on the wrong date — so it is pinned at the boundary, in
   `test/dashboard.feed.test.js`.
+
+### Inside `dashboard/src`
+
+Five layers, and the dependency direction runs strictly downward through them:
+
+| Layer | Holds | May import |
+|---|---|---|
+| `pages/` | one file per page; `pages/shared/` for what the three medical pages share | everything below |
+| `components/`, `charts/` | the reusable panels, and the ECharts wrappers | `model/`, `theme/` |
+| `app/` | shell, sidebar, router, the signals in `state.js`, the password's life in `auth.js` | `data/`, `theme/` |
+| `data/` | the one `fetch`, and what the dashboard asks each tab for | `model/` |
+| `model/` | every number and every rule. Pure functions, no DOM, no network | only other `model/` files |
+
+`model/` is the layer that matters. It is the only one under test, it is the only one a
+wrong number can come from, and it is the reason a page can be rewritten without
+re-deriving a single metric. A page that computes something itself instead of asking
+`model/` for it is the defect this table exists to prevent.
 
 Data never leaves the viewer's browser: it goes from the feed to the page and no further.
 There is no service account, no published CSV, no committed snapshot, and nothing

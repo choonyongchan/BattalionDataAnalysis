@@ -30,6 +30,24 @@ There is no migration code — this is done by hand, once, per spreadsheet.
 The other three tabs need no action: `Strength Data`, `Personnel Data` and
 `Command Roster` are created with their header rows on first write.
 
+## 1a. The two dashboard settings tabs
+
+Both are optional and both are created by hand. Nothing in `src/` writes either one — the
+dashboard is the only thing that reads them — so there is no first write to create them.
+Until they exist the dashboard reports them as absent on its Settings page and simply
+draws no holiday lines and offers no rotational grouping.
+
+- [ ] Create a tab named **Public Holidays** with exactly this header row:
+      `date | name`
+      One row per Singapore public holiday, `date` as `yyyy-MM-dd`. Trend charts draw a
+      light red line on each one, so a wrong date is visible rather than silent.
+- [ ] Create a tab named **Rotations** with exactly this header row:
+      `name | start_date | end_date`
+      One row per rotation — TRADES, Rot 1, Rot 2, Rot 3, Rot 4 — with dates as
+      `yyyy-MM-dd`. Leave `end_date` blank for a rotation still running. The dashboard's
+      Settings page flags gaps between rotations and overlaps between them; check it after
+      filling this in, because a gap silently sends those days into a "No rotation" bucket.
+
 ## 2. Script properties
 
 Set in the Apps Script editor under **Project Settings → Script properties**. There is
@@ -105,3 +123,31 @@ Untouched by this change, but it shares the one `doPost`, so it is worth one che
 - [ ] Submit the real form, or POST a Plumber-shaped body to
       `<web app URL>?route=reportsick`. Expect one new row on
       **Report Sick FormSG Responses**.
+
+## 8. The dashboard feed
+
+The feed reads two more tabs and one projection than it used to, so this needs a
+**new deployment**, not just a push.
+
+- [ ] Set `DASHBOARD_PASSWORD` under **Project Settings → Script properties** if it is not
+      already set. The route fails closed without it, so an unset property refuses every
+      request rather than waving one through.
+- [ ] POST `{"password":"<the password>"}` to `<web app URL>?route=dashboard` with
+      `Content-Type: text/plain`. Expect `ok: true` and a `tabs` object.
+- [ ] **The projection.** In that reply, find `tabs["Parade State Responses"]`. Its header
+      row must read exactly `["Timestamp","parade_response_id"]`. Search the whole reply
+      for a `T`-prefixed NRIC and for the string `Drop your Parade State here`; both must
+      be absent. This is the one check worth doing by hand every time the feed changes —
+      the message body is free text a duty commander typed, and it carries NRICs.
+- [ ] **Before** creating the two settings tabs, confirm `tabs["Public Holidays"]` and
+      `tabs["Rotations"]` are absent and the dashboard's Settings page names them as
+      missing, with the header row to paste. **After** creating them, confirm both load.
+- [ ] POST with a wrong password. Expect `{"ok":false,"error":"unauthorised"}` and no
+      `tabs` key at all — not an empty one.
+
+## 9. The published dashboard
+
+- [ ] After the Pages workflow runs, open the site. Confirm it loads (a blank page with a
+      404 on an asset means the Vite `base` setting and the Pages sub-path disagree).
+- [ ] Log in, then switch light/dark from the sidebar. Confirm the charts re-tint rather
+      than staying in the old palette.

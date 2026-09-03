@@ -30,6 +30,17 @@ function companyFrom_(text) {
 
 /**
  * Maps FormSG records to a common submission shape.
+ *
+ * The form asks two different questions about the same illness and they must not be
+ * merged. `symptomAnswer` is a pick-list — eight clean clinical options covering 97% of
+ * submissions — and it is what the clinical breakdown counts. `reason` is free text, and
+ * it is what the word cloud reads. Folding them into one string, as this function once
+ * did, costs both: the pick-list can then only be recovered by searching the blob for its
+ * own label, and the cloud fills up with the pick-list's boilerplate wording.
+ *
+ * `text` keeps the joined form, because the symptom lexicon works better across both
+ * fields than across either alone — a soldier who picks "Others" often names the symptom
+ * in the reason.
  * @param {Array<!Object>} rows Records from the FormSG tab.
  * @returns {Array<!Object>} Normalised submissions, oldest first.
  */
@@ -43,6 +54,7 @@ export function toSubmissions(rows) {
       const fourD = toText(row['4D Number (REC Only)']).toUpperCase();
       return {
         date: toIsoDate(row.Timestamp),
+        timestamp: row.Timestamp,
         rank: toText(row.RANK),
         name,
         fourD,
@@ -50,6 +62,8 @@ export function toSubmissions(rows) {
         company: companyFrom_(row['Unit & Coy']),
         unitText: toText(row['Unit & Coy']),
         reportSickType: toText(row['Report Sick Type']),
+        reason,
+        symptomAnswer,
         text,
         symptoms: extractSymptoms(text),
         keywords: keywords(text),

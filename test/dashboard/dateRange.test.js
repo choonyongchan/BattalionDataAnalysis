@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import {
+  PRESETS,
   addMonths,
   daysOfMonth,
   eachDay,
@@ -123,6 +124,60 @@ describe('resolvePreset', () => {
   test('an unknown name falls back to all', () => {
     expect(resolvePreset('nonsense', '2026-06-22')).toEqual({ from: null, to: null });
   });
+
+  test('thisWeek runs Monday through today, not through Sunday, when today is a Monday', () => {
+    // 2026-06-22 is itself a Monday, so the week has not started until today.
+    expect(resolvePreset('thisWeek', '2026-06-22')).toEqual({ from: '2026-06-22', to: '2026-06-22' });
+  });
+
+  test('thisWeek runs Monday through today when today is a Sunday', () => {
+    // 2026-06-28 is a Sunday: the full Mon-Sun week so far, not projected past today.
+    expect(resolvePreset('thisWeek', '2026-06-28')).toEqual({ from: '2026-06-22', to: '2026-06-28' });
+  });
+
+  test('lastWeek is the full Monday-Sunday before this week, across a month boundary', () => {
+    // 2026-07-03 is a Friday in the week of Mon 29 Jun; last week is Mon 22 Jun - Sun 28 Jun.
+    expect(resolvePreset('lastWeek', '2026-07-03')).toEqual({ from: '2026-06-22', to: '2026-06-28' });
+  });
+
+  test('thisMonth on the 1st is a single day, not the whole month', () => {
+    expect(resolvePreset('thisMonth', '2026-06-01')).toEqual({ from: '2026-06-01', to: '2026-06-01' });
+  });
+
+  test('thisMonth is an alias-compatible rename of the existing month preset', () => {
+    expect(resolvePreset('thisMonth', '2026-06-22')).toEqual(resolvePreset('month', '2026-06-22'));
+  });
+
+  test('lastMonth spans January across a year boundary', () => {
+    expect(resolvePreset('lastMonth', '2026-02-15')).toEqual({ from: '2026-01-01', to: '2026-01-31' });
+  });
+
+  test('lastMonth spans a 28-day February', () => {
+    expect(resolvePreset('lastMonth', '2026-03-10')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+  });
+
+  test('lastMonth spans a 29-day leap February', () => {
+    expect(resolvePreset('lastMonth', '2024-03-10')).toEqual({ from: '2024-02-01', to: '2024-02-29' });
+  });
+});
+
+describe('PRESETS', () => {
+  test('lists the quick-range buttons in display order', () => {
+    expect(PRESETS.map((preset) => preset.name)).toEqual([
+      'thisWeek',
+      'lastWeek',
+      'thisMonth',
+      'lastMonth',
+      'all',
+    ]);
+    expect(PRESETS.map((preset) => preset.label)).toEqual([
+      'This week',
+      'Last week',
+      'This month',
+      'Last month',
+      'All',
+    ]);
+  });
 });
 
 describe('month-grid arithmetic', () => {
@@ -151,9 +206,30 @@ describe('month-grid arithmetic', () => {
 
 describe('matchPreset', () => {
   test('recognises the range a preset produced', () => {
-    expect(matchPreset('2026-06-16', '2026-06-22', '2026-06-22')).toBe('last7');
-    expect(matchPreset('2026-06-01', '2026-06-22', '2026-06-22')).toBe('month');
     expect(matchPreset(null, null, '2026-06-22')).toBe('all');
+  });
+
+  // A range shaped like the legacy 'month' preset must light up the 'thisMonth' button —
+  // the two produce an identical range, and 'thisMonth' is the name PRESETS (and so the
+  // UI) actually uses. Returning 'month' here would mean no button ever lights up.
+  test('a this-month-shaped range matches thisMonth, not the legacy month name', () => {
+    expect(matchPreset('2026-06-01', '2026-06-22', '2026-06-22')).toBe('thisMonth');
+  });
+
+  test('recognises a thisWeek-shaped range', () => {
+    expect(matchPreset('2026-06-22', '2026-06-24', '2026-06-24')).toBe('thisWeek');
+  });
+
+  test('recognises a lastWeek-shaped range', () => {
+    expect(matchPreset('2026-06-15', '2026-06-21', '2026-06-24')).toBe('lastWeek');
+  });
+
+  test('recognises a lastMonth-shaped range', () => {
+    expect(matchPreset('2026-05-01', '2026-05-31', '2026-06-24')).toBe('lastMonth');
+  });
+
+  test('still recognises a last7-shaped range that no button represents', () => {
+    expect(matchPreset('2026-06-16', '2026-06-22', '2026-06-22')).toBe('last7');
   });
 
   test('returns null for a hand-picked span that matches no preset', () => {
