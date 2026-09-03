@@ -54,7 +54,7 @@ export function Sidebar({ open, onNavigate }) {
   return (
     <nav class="sidebar" data-open={String(open)} aria-label="Dashboard sections">
       <Link class="sidebar__brand" href="/overview" onClick={onNavigate}>
-        <Logo />
+        <Logo size={44} />
         <span>
           <span class="sidebar__wordmark">40 SAR</span>
           <span class="sidebar__unit">Personnel</span>

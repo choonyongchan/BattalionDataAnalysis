@@ -43,7 +43,7 @@ export function Login() {
     <main class="login">
       <div class="login__panel">
         <p class="login__brand">
-          <Logo size={40} />
+          <Logo size={88} />
         </p>
 
         <h1 class="login__title">Good day, Commander</h1>
