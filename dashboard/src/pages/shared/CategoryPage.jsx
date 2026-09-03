@@ -71,6 +71,46 @@ function RangeControls({ min, max }) {
 }
 
 /**
+ * One trend card: a Battalion/Companies toggle over a Line chart. Used for both the
+ * category's own duty-class trend and, where a page needs one, a second trend from a
+ * different source (Report Sick's FormSG submissions, which `dutyTrend` cannot read).
+ *
+ * A real component, not a helper called as a plain function, specifically so its
+ * `useState` for the scope toggle is safe — a second trend card built by calling a
+ * function during another component's render would share no hook slot of its own.
+ * @param {{title: string, coverage: string, trendFn: function(string, string[]): !Object,
+ *     dates: string[], weekends: Array<!Object>, holidays: Array<!Object>}} props The
+ *     card's title and coverage line; `trendFn(scope, dates)` returns `{dates, series}`;
+ *     the dates to plot and the weekend/holiday annotations to draw under them.
+ * @returns {!preact.VNode} The card.
+ */
+function TrendSection({ title, coverage, trendFn, dates, weekends, holidays }) {
+  const [scope, setScope] = useState('battalion');
+  const trend = trendFn(scope, dates);
+
+  return (
+    <Card title={title}>
+      <div class="controlrow">
+        <ScopeToggle value={scope} onChange={setScope} />
+      </div>
+      <ChartCard title="" coverage={coverage}>
+        <Line
+          categories={trend.dates}
+          series={trend.series.map((series) => ({
+            ...series,
+            slot: scope === 'companies' ? COMPANIES.indexOf(series.name) : undefined,
+            neutral: scope === 'battalion',
+          }))}
+          weekends={weekends}
+          holidays={holidays}
+          valueName="per 100"
+        />
+      </ChartCard>
+    </Card>
+  );
+}
+
+/**
  * The Company x Platoon heatmap of a duty class's rate.
  * @param {{personnel: Array<!Object>, episodes: Array<!Object>, dutyClass: string}} props
  *     Personnel rows (for the coverage note) and episodes to count.
@@ -339,6 +379,7 @@ export function CategoryPage(spec) {
     histogramBuilder,
     soldierIndex,
     extraTiles,
+    extraTrend,
     afterLeaderboardBuilder,
   } = spec;
 
@@ -363,7 +404,6 @@ export function CategoryPage(spec) {
     [spec.episodes, effectiveFrom, effectiveTo]
   );
 
-  const [scope, setScope] = useState('battalion');
   const [soldierKey, setSoldierKey] = useState(null);
 
   // Reasons-over-time is filtered to the same range as every other panel on the page.
@@ -390,7 +430,6 @@ export function CategoryPage(spec) {
   );
 
   const counts = episodeCounts(rangedEpisodes, dutyClass);
-  const trend = dutyTrend(dataset.personnel, dataset.strength, dutyClass, trendDates, { scope, session: 'FPS' });
 
   const leaderboard =
     leaderboardMetric === 'days'
@@ -414,27 +453,28 @@ export function CategoryPage(spec) {
         <Tile label="Episodes" value={fmtInt(counts.total.episodes)} />
         <Tile label="Soldiers" value={fmtInt(counts.total.soldiers)} />
         <Tile label="Episodes per soldier" value={counts.total.perSoldier === null ? '—' : counts.total.perSoldier.toFixed(1)} />
-        {extraTiles}
+        {extraTiles ? extraTiles(effectiveFrom, effectiveTo) : null}
       </TileRow>
 
-      <Card title={title + ' trend'}>
-        <div class="controlrow">
-          <ScopeToggle value={scope} onChange={setScope} />
-        </div>
-        <ChartCard title="" coverage="Rate per 100 accountable; a company not filing that day is a gap.">
-          <Line
-            categories={trend.dates}
-            series={trend.series.map((series) => ({
-              ...series,
-              slot: scope === 'companies' ? COMPANIES.indexOf(series.name) : undefined,
-              neutral: scope === 'battalion',
-            }))}
-            weekends={weekends}
-            holidays={rangeHolidays}
-            valueName="per 100"
-          />
-        </ChartCard>
-      </Card>
+      <TrendSection
+        title={title + ' trend'}
+        coverage="Rate per 100 accountable; a company not filing that day is a gap."
+        trendFn={(scope, dates) => dutyTrend(dataset.personnel, dataset.strength, dutyClass, dates, { scope, session: 'FPS' })}
+        dates={trendDates}
+        weekends={weekends}
+        holidays={rangeHolidays}
+      />
+
+      {extraTrend ? (
+        <TrendSection
+          title={extraTrend.title}
+          coverage={extraTrend.coverage}
+          trendFn={extraTrend.trendFn}
+          dates={trendDates}
+          weekends={weekends}
+          holidays={rangeHolidays}
+        />
+      ) : null}
 
       {showHeatmap ? <PlatoonHeatmap episodes={rangedEpisodes} dutyClass={dutyClass} /> : null}
 

@@ -11,10 +11,11 @@ import { useMemo } from 'preact/hooks';
 import { dataset } from '../app/state.js';
 import { Card, Coverage } from '../components/Card.jsx';
 import { DataTable } from '../components/Table.jsx';
+import { Tile } from '../components/Tile.jsx';
 import { fmtInt } from '../components/format.js';
 import { DUTY_CLASS } from '../model/classify.js';
 import { buildEpisodes } from '../model/episodes.js';
-import { submissionRateByCompany, toSubmissions, topSubmitters } from '../model/formsg.js';
+import { submissionRateByCompany, submissionTrend, toSubmissions, topSubmitters } from '../model/formsg.js';
 import { soldierIndex } from '../model/soldier.js';
 import { clinicalBucketOf, reasonKeywords } from '../model/symptoms.js';
 import { isWeekend } from '../model/dates.js';
@@ -123,6 +124,21 @@ export function ReportSick() {
   const histogramBuilder = (from, to) =>
     hourBins(submissions.filter((s) => withinRange(s.date, from, to)));
 
+  // Requirement 3.1/3.2: the FormSG side gets its own tile and trend, not only the
+  // parade-state "reporting sick" CategoryPage already draws — the two are independent
+  // sources of the same event and a reader comparing them needs both on screen at once.
+  const extraTiles = (from, to) => (
+    <Tile
+      label="Reported sick (FormSG)"
+      value={fmtInt(submissions.filter((s) => withinRange(s.date, from, to)).length)}
+    />
+  );
+  const extraTrend = {
+    title: 'Reported sick (FormSG) trend',
+    coverage: 'FormSG submissions; a company with no submissions in range is drawn flat at zero, not a gap.',
+    trendFn: (scope, dates) => submissionTrend(submissions, data.strength, dates, { scope, session: 'FPS' }),
+  };
+
   return (
     <CategoryPage
       title="Report sick"
@@ -131,6 +147,8 @@ export function ReportSick() {
       dutyClass={DUTY_CLASS.REPORT_SICK}
       leaderboardMetric="count"
       reasonSource={reasonSource}
+      extraTiles={extraTiles}
+      extraTrend={extraTrend}
       showHeatmap
       showWordCloud
       wordCloudBuilder={wordCloudBuilder}
