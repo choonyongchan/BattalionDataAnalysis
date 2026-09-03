@@ -19,7 +19,7 @@
  * @type {string}
  */
 export const FEED_URL =
-  'https://script.google.com/macros/s/AKfycbwm2lXBjeqFFy1wYvufxb8O6W1yG_Md-hhi64R3wzK6RN6v2fLL9TQlHJLxmYlQTLA/exec?route=dashboard';
+  'https://script.google.com/macros/s/AKfycbz8_zMmzsdpfX2C0FHJNV7xqwupy1AbPaeoi8TQU_FHhLazYA8T1ozqctx7lisDjJda/exec?route=dashboard';
 
 /**
  * Where the spreadsheet itself lives, for the "edit in Sheets" links on Settings.
